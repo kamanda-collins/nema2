@@ -1,0 +1,104 @@
+<svg viewBox="0 0 175 240" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <!-- Main logo gradient -->
+    <linearGradient id="logoGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#2196f3;stop-opacity:1" />
+      <stop offset="50%" style="stop-color:#1976d2;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#0d47a1;stop-opacity:1" />
+    </linearGradient>
+    
+    <!-- Shadow filter -->
+    <filter id="dropShadow" x="-50%" y="-50%" width="200%" height="200%">
+      <feDropShadow dx="3" dy="3" stdDeviation="8" flood-color="#000" flood-opacity="0.3"/>
+    </filter>
+  </defs>
+  
+  <!-- Main K structure with bull/shark fusion -->
+  <g transform="translate(87.5, 120)" filter="url(#dropShadow)">
+    
+    <!-- Left vertical spine (bull's back/shark's dorsal) -->
+    <path d="M -80 -120 L -65 -120 L -65 120 L -80 120 Z" 
+          fill="url(#logoGradient)" 
+          stroke="#0d47a1" 
+          stroke-width="1"/>
+    
+    <!-- Upper diagonal (bull horn/shark fin fusion) -->
+    <path d="M -65 -40 
+             L -30 -80 
+             L 10 -120 
+             L 45 -120 
+             L 70 -100 
+             L 85 -80 
+             L 90 -60 
+             L 85 -40 
+             L 70 -25 
+             L 45 -15 
+             L 10 -25 
+             L -30 -40 
+             L -65 -40 Z" 
+          fill="url(#logoGradient)" 
+          stroke="#0d47a1" 
+          stroke-width="1"/>
+    
+    <!-- Lower diagonal (shark tail/bull leg fusion) -->
+    <path d="M -65 40 
+             L -30 40 
+             L 10 25 
+             L 45 15 
+             L 70 25 
+             L 85 40 
+             L 90 60 
+             L 85 80 
+             L 70 100 
+             L 45 120 
+             L 10 120 
+             L -30 80 
+             L -65 40 Z" 
+          fill="url(#logoGradient)" 
+          stroke="#0d47a1" 
+          stroke-width="1"/>
+    
+    <!-- Bull horn detail (upper) -->
+    <path d="M 70 -90 
+             L 85 -85 
+             L 88 -70 
+             L 85 -55 
+             L 75 -45 
+             L 65 -50 
+             L 70 -65 
+             L 70 -90 Z" 
+          fill="#1565c0" 
+          opacity="0.8"/>
+    
+    <!-- Shark fin detail (lower) -->
+    <path d="M 70 90 
+             L 85 85 
+             L 88 70 
+             L 85 55 
+             L 75 45 
+             L 65 50 
+             L 70 65 
+             L 70 90 Z" 
+          fill="#1565c0" 
+          opacity="0.8"/>
+    
+    <!-- Central connecting element (predator eye/power core) -->
+    <circle cx="-45" cy="0" r="8" fill="#64b5f6" opacity="0.9"/>
+    <circle cx="-45" cy="0" r="4" fill="#ffffff" opacity="0.8"/>
+    
+    <!-- Sharp edge highlights -->
+    <path d="M -65 -40 L 85 -40 L 70 -25 L -50 -25 Z" 
+          fill="#42a5f5" 
+          opacity="0.3"/>
+    
+    <path d="M -65 40 L 85 40 L 70 25 L -50 25 Z" 
+          fill="#42a5f5" 
+          opacity="0.3"/>
+    
+    <!-- Aggressive serrated edges -->
+    <path d="M 75 -30 L 80 -35 L 85 -30 L 80 -25 Z" fill="#1976d2"/>
+    <path d="M 75 30 L 80 35 L 85 30 L 80 25 Z" fill="#1976d2"/>
+    
+  </g>
+  
+</svg>

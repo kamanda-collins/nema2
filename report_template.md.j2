@@ -1,0 +1,59 @@
+# NEMA Uganda Environmental Compliance Report
+
+**Date:** {{ date }}
+**Number of site features:** {{ num_features }}
+
+## 1. Executive Summary
+
+{{ executive_summary }}
+
+## 2. Introduction
+
+**2.1 Purpose of the Report:** {{ purpose }}
+
+**2.2 Project/Operation Description:** {{ project_description }}
+
+**2.3 Legal and Regulatory Framework:**
+- The National Environment Act, 2019 [1]
+- Relevant Environmental Impact Assessment (EIA) Regulations
+- Sector-based regulations as applicable
+
+## 3. Environmental Management System (EMS) Overview
+
+{{ ems_overview }}
+
+## 4. Compliance Monitoring and Performance
+
+**Wetland Compliance Status:**
+
+{% if in_wetland %}
+**Result:** Site is in/overlaps a wetland.
+**Wetland(s):** {{ wetland_names|join(', ') if wetland_names else 'N/A' }}
+**Action:** Please contact NEMA for compliance procedures and obtain the necessary permissions.
+{% else %}
+**Result:** Site is NOT in a mapped wetland.
+**Distance to nearest wetland:** {{ min_distance|round(2) }} meters
+{% endif %}
+
+## 5. Environmental Audits and Inspections
+
+{{ audits_summary }}
+
+## 6. Community Engagement and Grievance Mechanism
+
+{{ community_engagement }}
+
+## 7. Challenges and Future Plans
+
+{{ challenges }}
+
+## 8. Conclusion
+
+{{ conclusion }}
+
+## 9. References
+
+[1] The National Environment Act, 2019. Available at: https://nema.go.ug/sites/all/themes/nema/docs/National%20Environment%20Act,%2C%202019%20(1).pdf
+
+---
+This is an automated report. For official compliance, consult NEMA Uganda.

@@ -1,0 +1,104 @@
+/* mobile_optimized.css
+   KamandaLabs NEMA App Custom Styles
+   - Mobile-first responsive design
+   - Professional, clean look
+   - Hides Streamlit default menu/footer
+   - Custom branding colors
+*/
+
+/* Hide Streamlit hamburger menu and footer */
+#MainMenu, footer {display: none !important;}
+
+/* KamandaLabs branding color palette */
+:root {
+  --kl-primary: #1a237e;
+  --kl-accent: #00bfae;
+  --kl-bg: #f5f7fa;
+  --kl-header: #263238;
+}
+
+/* App background and font */
+body, .stApp {
+  background: var(--kl-bg) !important;
+  font-family: 'Inter', 'Segoe UI', Arial, sans-serif !important;
+  color: #222;
+}
+
+/* Header styling */
+.stApp > header, .stApp h1, .stApp h2 {
+  color: var(--kl-primary) !important;
+  font-weight: 700;
+}
+
+/* Card-like container for main content */
+.block-container {
+  background: #fff;
+  border-radius: 16px;
+  box-shadow: 0 2px 12px rgba(26,35,126,0.07);
+  padding: 1.5rem 1rem;
+  margin-top: 1rem;
+}
+
+/* Buttons */
+.stButton > button {
+  background: var(--kl-accent) !important;
+  color: #fff !important;
+  border-radius: 8px !important;
+  border: none !important;
+  font-weight: 600;
+  padding: 0.7em 1.5em;
+  font-size: 1.1em;
+  transition: background 0.2s;
+}
+.stButton > button:hover {
+  background: #009e8e !important;
+}
+
+/* Responsive tweaks for mobile */
+@media (max-width: 600px) {
+  .block-container {
+    padding: 0.5rem 0.2rem;
+    margin-top: 0.5rem;
+  }
+  .stApp h1, .stApp h2 {
+    font-size: 1.2em !important;
+  }
+  .stButton > button {
+    font-size: 1em;
+    padding: 0.5em 1em;
+  }
+  .stDownloadButton > button {
+    font-size: 1em;
+    padding: 0.5em 1em;
+  }
+}
+
+/* Download buttons */
+.stDownloadButton > button {
+  background: var(--kl-primary) !important;
+  color: #fff !important;
+  border-radius: 8px !important;
+  border: none !important;
+  font-weight: 600;
+  padding: 0.7em 1.5em;
+  font-size: 1.1em;
+  margin-top: 0.5em;
+}
+.stDownloadButton > button:hover {
+  background: #3949ab !important;
+}
+
+/* Contact section collapsible tweaks */
+details[open] summary ~ * {
+  animation: fadeIn 0.3s;
+}
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* Misc: Remove Streamlit's default focus ring for a cleaner look */
+.stButton > button:focus, .stDownloadButton > button:focus {
+  outline: none !important;
+  box-shadow: 0 0 0 2px var(--kl-accent)33;
+}

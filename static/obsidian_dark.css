@@ -1,0 +1,128 @@
+/* obsidian_dark.css
+   KamandaLabs NEMA App Obsidian Dark Theme
+   - Obsidian-inspired dark UI
+   - Professional, clean look
+   - Hides Streamlit default menu/footer
+   - Custom branding colors
+*/
+
+#MainMenu, footer {display: none !important;}
+
+
+:root {
+  --kl-bg: #181a20;
+  --kl-panel: #181a20;
+  --kl-primary: #a259e6;
+  --kl-accent: #7c3aed;
+  --kl-header: #fff;
+  --kl-text: #f3eaff;
+  --kl-muted: #b39ddb;
+  --purple-gradient: linear-gradient(135deg, #7c3aed 0%, #a259e6 100%);
+  --map-btn: #a259e6;
+  --map-btn-hover: #7c3aed;
+  --texture-url: url('https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=800&q=80'); /* fallback texture */
+}
+
+body, .stApp {
+  background: var(--kl-bg) !important;
+  color: var(--kl-text) !important;
+  font-family: 'Inter', 'Segoe UI', Arial, sans-serif !important;
+  background-image: none !important;
+}
+
+
+.stApp > header, .stApp h2 {
+  color: var(--kl-primary) !important;
+  font-weight: 700;
+}
+
+/* NEMA Compliance Checker heading purple gradient */
+.stApp h1, h1[style*="NEMA Compliance Checker"] {
+  color: #fff !important;
+  background: none !important;
+  -webkit-background-clip: unset !important;
+  -webkit-text-fill-color: unset !important;
+  background-clip: unset !important;
+  font-weight: 900 !important;
+  letter-spacing: 0.5px;
+  text-shadow: none !important;
+}
+
+.block-container {
+  background: var(--kl-panel) !important;
+  border-radius: 16px;
+  box-shadow: 0 2px 12px #7c3aed33;
+  padding: 1.5rem 1rem;
+  margin-top: 1rem;
+}
+
+
+.stButton > button, .stDownloadButton > button {
+  background: var(--kl-primary) !important;
+  color: #fff !important;
+  border-radius: 8px !important;
+  border: none !important;
+  font-weight: 600;
+  padding: 0.7em 1.5em;
+  font-size: 1.1em;
+  transition: background 0.2s;
+  box-shadow: 0 2px 8px #7c3aed33;
+}
+.stButton > button:hover, .stDownloadButton > button:hover {
+  background: var(--kl-accent) !important;
+  color: #fff !important;
+}
+
+/* Interactive Map Button: yellow accent */
+.stButton > button:has(span:contains('Use Interactive Map')) {
+  background: var(--map-btn) !important;
+  color: #fff !important;
+  font-weight: 700;
+  border: 2px solid var(--kl-accent) !important;
+  box-shadow: 0 2px 8px #a259e633;
+}
+.stButton > button:has(span:contains('Use Interactive Map')):hover {
+  background: var(--map-btn-hover) !important;
+  color: #fff !important;
+}
+
+.stButton > button:focus, .stDownloadButton > button:focus {
+  outline: none !important;
+  box-shadow: 0 0 0 2px var(--kl-primary)55;
+}
+
+.stRadio > div, .stRadio label, .stSelectbox label, .stTextInput label, .stTextArea label {
+  color: var(--kl-text) !important;
+}
+
+.stTextInput > div > input, .stTextArea > div > textarea {
+  background: var(--kl-panel) !important;
+  color: var(--kl-text) !important;
+  border: 1px solid var(--kl-primary) !important;
+  border-radius: 8px !important;
+}
+
+.stExpanderHeader, .stExpanderContent {
+  background: var(--kl-panel) !important;
+  color: var(--kl-text) !important;
+}
+
+.stAlert, .stInfo, .stWarning, .stSuccess, .stError {
+  background: #23262e !important;
+  color: #fff !important;
+  border-left: 5px solid var(--kl-primary) !important;
+}
+
+@media (max-width: 600px) {
+  .block-container {
+    padding: 0.5rem 0.2rem;
+    margin-top: 0.5rem;
+  }
+  .stApp h1, .stApp h2 {
+    font-size: 1.2em !important;
+  }
+  .stButton > button, .stDownloadButton > button {
+    font-size: 1em;
+    padding: 0.5em 1em;
+  }
+}
