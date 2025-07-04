@@ -175,14 +175,14 @@
         <iframe 
             id="nema-app"
             class="nema-embed"
-            src="https://nema.kamandalabs.me"
+            src="https://nema-kamandalabs.streamlit.app"
             title="NEMA Compliance Checker"
             allowfullscreen>
         </iframe>
         
         <!-- Call to Action -->
         <div class="nema-cta">
-            <a href="https://nema.kamandalabs.me" class="nema-button" target="_blank">
+            <a href="https://nema-kamandalabs.streamlit.app" class="nema-button" target="_blank">
                 🚀 Open Full Application
             </a>
         </div>
@@ -209,9 +209,9 @@
             // Update iframe source
             const iframe = document.getElementById('nema-app');
             if (environment === 'production') {
-                iframe.src = 'https://nema.kamandalabs.me';
+                iframe.src = 'https://nema-kamandalabs.streamlit.app';
             } else {
-                iframe.src = 'https://dev.nema.kamandalabs.me';
+                iframe.src = 'https://nema-kamandalabs.streamlit.app?embed=true';
             }
         }
         

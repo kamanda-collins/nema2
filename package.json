@@ -1,0 +1,27 @@
+{
+  "name": "nema-compliance-checker-web",
+  "version": "1.0.0",
+  "description": "Web interface for NEMA Wetlands Compliance Checker",
+  "main": "public/index.html",
+  "scripts": {
+    "dev": "python -m http.server 3000 --directory public",
+    "build": "echo 'Static site - no build needed'",
+    "start": "python -m http.server 8080 --directory public"
+  },
+  "keywords": [
+    "nema",
+    "wetlands",
+    "compliance",
+    "environmental",
+    "assessment",
+    "kenya",
+    "uganda"
+  ],
+  "author": "KamandaLabs",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/kamandalabs/nema-compliance-web"
+  },
+  "homepage": "https://nema.kamandalabs.me"
+}

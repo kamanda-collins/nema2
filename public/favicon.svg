@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <defs>
+    <linearGradient id="gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#667eea;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#764ba2;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  
+  <!-- Background circle -->
+  <circle cx="32" cy="32" r="30" fill="url(#gradient)"/>
+  
+  <!-- Wetland/water representation -->
+  <path d="M16 32 Q24 28 32 32 Q40 36 48 32 Q40 40 32 36 Q24 32 16 36 Z" fill="#4fc3f7" opacity="0.8"/>
+  
+  <!-- Plant/vegetation -->
+  <path d="M28 40 Q30 35 32 40 Q34 35 36 40" stroke="#66bb6a" stroke-width="2" fill="none"/>
+  <path d="M26 38 Q28 33 30 38" stroke="#66bb6a" stroke-width="1.5" fill="none"/>
+  <path d="M34 38 Q36 33 38 38" stroke="#66bb6a" stroke-width="1.5" fill="none"/>
+  
+  <!-- Shield/protection symbol -->
+  <path d="M32 20 L36 22 L36 28 Q36 32 32 34 Q28 32 28 28 L28 22 Z" fill="white" opacity="0.9"/>
+  <path d="M30 26 L32 28 L34 24" stroke="#667eea" stroke-width="1.5" fill="none"/>
+</svg>

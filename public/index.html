@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NEMA Compliance Checker - Environmental Assessment Tool</title>
+    <meta name="description" content="Professional wetland compliance assessment tool for Kenya and Uganda. Generate NEMA-compliant environmental reports with interactive mapping.">
+    <meta name="keywords" content="NEMA, wetlands, environmental compliance, Kenya, Uganda, EIA, environmental assessment">
+    
+    <!-- Open Graph / Facebook -->
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://nema.kamandalabs.me/">
+    <meta property="og:title" content="NEMA Compliance Checker">
+    <meta property="og:description" content="Professional wetland compliance assessment tool for environmental impact analysis">
+    <meta property="og:image" content="https://nema.kamandalabs.me/og-image.png">
+
+    <!-- Twitter -->
+    <meta property="twitter:card" content="summary_large_image">
+    <meta property="twitter:url" content="https://nema.kamandalabs.me/">
+    <meta property="twitter:title" content="NEMA Compliance Checker">
+    <meta property="twitter:description" content="Professional wetland compliance assessment tool for environmental impact analysis">
+    <meta property="twitter:image" content="https://nema.kamandalabs.me/og-image.png">
+
+    <!-- Favicon -->
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+    <link rel="icon" type="image/png" href="/favicon.png">
+
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background: #f8fafc;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 0 20px;
+        }
+
+        /* Header */
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 2rem 0;
+            text-align: center;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+        }
+
+        .header p {
+            font-size: 1.2rem;
+            opacity: 0.9;
+            max-width: 600px;
+            margin: 0 auto;
+        }
+
+        /* Features Grid */
+        .features {
+            padding: 3rem 0;
+            background: white;
+        }
+
+        .features-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 2rem;
+            margin-top: 2rem;
+        }
+
+        .feature-card {
+            background: white;
+            padding: 2rem;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+            text-align: center;
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+
+        .feature-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 8px 30px rgba(0,0,0,0.12);
+        }
+
+        .feature-icon {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+        }
+
+        .feature-card h3 {
+            color: #667eea;
+            margin-bottom: 1rem;
+            font-size: 1.3rem;
+        }
+
+        .feature-card p {
+            color: #666;
+            line-height: 1.6;
+        }
+
+        /* App Container */
+        .app-container {
+            background: white;
+            padding: 2rem 0;
+            min-height: 100vh;
+        }
+
+        .app-embed {
+            width: 100%;
+            height: 85vh;
+            min-height: 800px;
+            border: none;
+            border-radius: 12px;
+            box-shadow: 0 8px 40px rgba(0,0,0,0.1);
+            background: #f8fafc;
+            transition: opacity 0.3s ease;
+        }
+
+        .loading {
+            position: relative;
+            background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+            background-size: 200% 100%;
+            animation: loading 1.5s infinite;
+        }
+
+        @keyframes loading {
+            0% { background-position: 200% 0; }
+            100% { background-position: -200% 0; }
+        }
+
+        /* Quick Actions */
+        .quick-actions {
+            display: flex;
+            justify-content: center;
+            gap: 1rem;
+            margin: 2rem 0;
+            flex-wrap: wrap;
+        }
+
+        .action-btn {
+            padding: 0.8rem 1.5rem;
+            background: #667eea;
+            color: white;
+            text-decoration: none;
+            border-radius: 25px;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+        }
+
+        .action-btn:hover {
+            background: #5a6fd8;
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
+        }
+
+        .action-btn.secondary {
+            background: transparent;
+            border: 2px solid #667eea;
+            color: #667eea;
+        }
+
+        .action-btn.secondary:hover {
+            background: #667eea;
+            color: white;
+        }
+
+        /* Footer */
+        .footer {
+            background: #2d3748;
+            color: white;
+            padding: 2rem 0;
+            text-align: center;
+        }
+
+        .footer p {
+            margin-bottom: 1rem;
+        }
+
+        .footer a {
+            color: #667eea;
+            text-decoration: none;
+        }
+
+        .footer a:hover {
+            text-decoration: underline;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .header h1 {
+                font-size: 2rem;
+            }
+
+            .header p {
+                font-size: 1rem;
+            }
+
+            .app-embed {
+                height: 70vh;
+                min-height: 600px;
+            }
+
+            .quick-actions {
+                flex-direction: column;
+                align-items: center;
+            }
+        }
+
+        /* Hide Streamlit elements for cleaner embed */
+        .app-embed {
+            border: none;
+        }
+    </style>
+</head>
+<body>
+    <!-- Header -->
+    <header class="header">
+        <div class="container">
+            <h1>🌿 NEMA Compliance Checker</h1>
+            <p>Professional wetland compliance assessment tool for environmental impact analysis in Kenya and Uganda</p>
+        </div>
+    </header>
+
+    <!-- Features Section -->
+    <section class="features">
+        <div class="container">
+            <h2 style="text-align: center; color: #2d3748; margin-bottom: 1rem;">Key Features</h2>
+            
+            <div class="features-grid">
+                <div class="feature-card">
+                    <div class="feature-icon">🗺️</div>
+                    <h3>Interactive Mapping</h3>
+                    <p>Draw and analyze sites directly on interactive maps with real-time wetland detection and proximity analysis</p>
+                </div>
+                
+                <div class="feature-card">
+                    <div class="feature-icon">📊</div>
+                    <h3>Batch Processing</h3>
+                    <p>Process multiple sites simultaneously with comprehensive reporting and data export capabilities</p>
+                </div>
+                
+                <div class="feature-card">
+                    <div class="feature-icon">⚖️</div>
+                    <h3>NEMA Compliance</h3>
+                    <p>Automated compliance checking aligned with National Environment Management Authority guidelines</p>
+                </div>
+                
+                <div class="feature-card">
+                    <div class="feature-icon">📈</div>
+                    <h3>Professional Reports</h3>
+                    <p>Generate detailed compliance reports with maps, risk assessments, and regulatory recommendations</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Quick Actions -->
+    <div class="container">
+        <div class="quick-actions">
+            <a href="https://nema-kamandalabs.streamlit.app" class="action-btn" target="_blank">
+                🚀 Open Full Screen
+            </a>
+            <a href="#app" class="action-btn secondary">
+                📋 Start Assessment
+            </a>
+        </div>
+    </div>
+
+    <!-- Main App Container -->
+    <section class="app-container" id="app">
+        <div class="container">
+            <iframe 
+                id="nema-app"
+                class="app-embed loading"
+                src="https://nema-kamandalabs.streamlit.app?embed=true"
+                title="NEMA Compliance Checker Application"
+                allowfullscreen>
+                <p>Your browser does not support iframes. Please <a href="https://nema-kamandalabs.streamlit.app" target="_blank">click here to access the application directly</a>.</p>
+            </iframe>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="container">
+            <p>&copy; 2025 KamandaLabs. Built for environmental conservation and regulatory compliance.</p>
+            <p>
+                <a href="https://kamandalabs.com" target="_blank">KamandaLabs</a> | 
+                <a href="mailto:contact@kamandalabs.com">Contact</a> | 
+                <a href="https://github.com/kamandalabs" target="_blank">GitHub</a>
+            </p>
+        </div>
+    </footer>
+
+    <script>
+        // Loading state management
+        const iframe = document.getElementById('nema-app');
+        
+        iframe.addEventListener('load', function() {
+            this.classList.remove('loading');
+            this.style.opacity = '1';
+        });
+
+        // Smooth scrolling for anchor links
+        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+            anchor.addEventListener('click', function (e) {
+                e.preventDefault();
+                const target = document.querySelector(this.getAttribute('href'));
+                if (target) {
+                    target.scrollIntoView({
+                        behavior: 'smooth',
+                        block: 'start'
+                    });
+                }
+            });
+        });
+
+        // Add loading timeout fallback
+        setTimeout(() => {
+            iframe.classList.remove('loading');
+        }, 5000);
+
+        // Analytics (if needed)
+        // Add your analytics code here
+        
+        // Error handling for iframe
+        iframe.addEventListener('error', function() {
+            console.error('Failed to load NEMA app');
+            this.style.background = '#f8f9fa';
+            this.innerHTML = '<p style="text-align: center; padding: 2rem; color: #666;">Unable to load the application. Please <a href="https://nema-kamandalabs.streamlit.app" target="_blank" style="color: #667eea;">click here to access it directly</a>.</p>';
+        });
+    </script>
+</body>
+</html>
