@@ -1,10 +1,13 @@
 # NEMA Wetlands Compliance Checker
 
-A comprehensive Streamlit web application for environmental compliance assessment around wetlands in Uganda and Kenya. This tool helps developers, environmental consultants, and regulatory bodies assess potential environmental impacts of proposed development projects near sensitive wetland ecosystems.
+A Streamlit web application for wetland & water risk checks on land in Uganda and Kenya — **built for real estate**: plot buyers, sellers, agents, developers and investors. Pick any plot and the app automatically fetches mapped wetlands, lakes, rivers and streams around it from OpenStreetMap (no GIS files needed), then tells you what the proximity means for your purchase or development decision — including NEMA compliance implications.
+
+It remains useful for environmental consultants and regulators doing rapid NEMA screening of development sites near sensitive wetland ecosystems.
 
 ## 🌍 What This App Does
 
 ### Core Functionality
+- **Live OpenStreetMap Data (default)**: Wetlands, water bodies and waterways are fetched automatically around your plot via the Overpass API — zero file preparation
 - **Wetland Proximity Analysis**: Automatically detects wetlands within specified buffer zones around project sites
 - **Environmental Impact Assessment**: Analyzes potential impacts based on proximity, wetland types, and project characteristics
 - **Compliance Reporting**: Generates detailed compliance reports with recommendations and regulatory requirements
@@ -86,6 +89,12 @@ streamlit run app.py
 
 ## 🏗️ Use Cases
 
+### Real Estate Agents, Buyers & Investors
+- Pre-purchase due diligence: is the plot inside or near a wetland?
+- Understand flooding exposure and development restrictions before committing funds
+- Generate professional risk reports for clients and negotiations
+- Batch-screen multiple plots/portfolios at once
+
 ### Environmental Consultants
 - Pre-screening project sites for environmental sensitivity
 - Generating preliminary impact assessments
@@ -113,7 +122,7 @@ streamlit run app.py
 ## 📊 Technical Specifications
 
 ### Data Sources
-- **Wetlands**: OpenStreetMap (OSM) water bodies and waterways
+- **Wetlands**: Live OpenStreetMap (Overpass API) wetlands, water bodies & waterways — plus optional local shapefiles, OGC WFS and ArcGIS REST
 - **Basemaps**: Esri WorldImagery, CartoDB, OpenStreetMap
 - **Projections**: Automatic UTM zone selection (36N/37N or southern equivalents) for meter-accurate distances and buffers; EPSG:32636 fallback
 - **Coverage**: Uganda, Kenya, and surrounding regions

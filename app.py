@@ -32,14 +32,14 @@ if os.path.exists(favicon_path):
     favicon_url = f"data:image/svg+xml;base64,{favicon_b64}"
     
     st.set_page_config(
-        page_title="NEMA Compliance Checker - KamandaLabs",
+        page_title="NEMA Compliance Checker — Real Estate Edition",
         page_icon=favicon_url,
         layout="wide",
         initial_sidebar_state="collapsed"
     )
 else:
     st.set_page_config(
-        page_title="NEMA Compliance Checker - KamandaLabs",
+        page_title="NEMA Compliance Checker — Real Estate Edition",
         page_icon="🌿",
         layout="wide",
         initial_sidebar_state="collapsed"
@@ -62,6 +62,7 @@ from report_logic import check_compliance, calculate_min_distance, render_compli
 from data_sources import load_wetlands_from_file, load_wetlands_from_wfs, load_wetlands_from_arcgis
 from batch_processing import show_batch_processing_ui, process_batch_sites, generate_batch_report
 from geo_utils import union_all_geoseries, estimate_utm_crs_for
+from osm_data import fetch_osm_wetlands
 
 # Always define these first!
 site_gdf = None
@@ -149,6 +150,37 @@ st.markdown('''
 def concise(text):
     return f"<span style='font-size:1.05em;color:#e0e0e0;'>{text}</span>"
 
+
+# --- Real-estate buyer guidance (plain text, reused in the downloadable report) ---
+def build_property_guidance(in_wetland, min_distance):
+    """Translate the compliance result into purchase/development advice."""
+    if in_wetland:
+        return (
+            "🚫 **High risk:** the plot overlaps a mapped wetland. Development inside wetlands is "
+            "restricted and NEMA restoration orders are possible — treat this land as unsuitable for "
+            "building unless you obtain written NEMA approval. Seek legal advice before closing any "
+            "purchase, and verify with an official NEMA map."
+        )
+    if min_distance is None:
+        return ""
+    if min_distance < 100:
+        return (
+            "🟠 **High caution:** the plot sits within ~100 m of a mapped wetland. Expect NEMA "
+            "screening/EIA requirements and possible seasonal flooding. Verify the legal buffer "
+            "(often 30–100 m depending on the water body) with NEMA/WRA before buying or building."
+        )
+    if min_distance < 500:
+        return (
+            "🟡 **Moderate:** the plot is close to a wetland. Check the plot's drainage and flood "
+            "history, and budget for possible EIA costs in your development plans. Generally "
+            "developable, but do your due diligence."
+        )
+    return (
+        "🟢 **Lower wetland risk:** no mapped wetland near the plot. OpenStreetMap coverage can be "
+        "incomplete, so a site visit and an official NEMA/WRA map check are still recommended "
+        "before you commit funds."
+    )
+
 # --- 1. Input Data Logic ---
 
 # --- Professional Header with Branding ---
@@ -173,6 +205,7 @@ if os.path.exists(logo_path):
     <div class='header-container' style='display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;'>
         <div style='display:flex;align-items:center;gap:14px;flex-wrap:wrap;'>
             <h1 style="margin-bottom:0;font-size:2.1em;color:#fff;font-weight:900;letter-spacing:0.5px;">NEMA Compliance Checker</h1>
+            <span style='background:#1e88e5;color:#fff;padding:3px 12px;border-radius:14px;font-size:0.55em;font-weight:700;letter-spacing:1px;vertical-align:middle;'>🏠 REAL ESTATE EDITION</span>
             <img src='https://upload.wikimedia.org/wikipedia/commons/4/4e/Flag_of_Uganda.svg' width='36' style='border-radius:6px;border:1.5px solid #222;'>
         </div>
         <div style='margin-left:auto;flex-shrink:0;'>
@@ -180,17 +213,18 @@ if os.path.exists(logo_path):
         </div>
     </div>
     <div style='font-size:1.1em;margin-top:0.2em;background: linear-gradient(90deg, #a259e6 0%, #6d3680 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; color: transparent; font-weight:bold;'>by <a href='https://kamandalabs.me' target='_blank' style='color:inherit;text-decoration:none;font-weight:bold;'>KamandaLabs</a></div>
-    <div style='font-size:1.1em;margin-top:0.7em;color:#e0e0e0;'>Upload your site coordinates to check for wetland compliance.</div>
+    <div style='font-size:1.1em;margin-top:0.7em;color:#e0e0e0;'>🏠 Check any plot for wetland &amp; water risks before you buy, sell, or build — no GIS files needed; data loads automatically from OpenStreetMap.</div>
     """, unsafe_allow_html=True)
 else:
     # Fallback without logo
     st.markdown("""
     <div class='header-container' style='display:flex;align-items:center;gap:14px;flex-wrap:wrap;'>
       <h1 style="margin-bottom:0;font-size:2.1em;color:#fff;font-weight:900;letter-spacing:0.5px;">NEMA Compliance Checker</h1>
+      <span style='background:#1e88e5;color:#fff;padding:3px 12px;border-radius:14px;font-size:0.55em;font-weight:700;letter-spacing:1px;vertical-align:middle;'>🏠 REAL ESTATE EDITION</span>
       <img src='https://upload.wikimedia.org/wikipedia/commons/4/4e/Flag_of_Uganda.svg' width='36' style='border-radius:6px;border:1.5px solid #222;'>
     </div>
     <div style='font-size:1.1em;margin-top:0.2em;background: linear-gradient(90deg, #a259e6 0%, #6d3680 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; color: transparent; font-weight:bold;'>by <a href='https://kamandalabs.me' target='_blank' style='color:inherit;text-decoration:none;font-weight:bold;'>KamandaLabs</a></div>
-    <div style='font-size:1.1em;margin-top:0.7em;color:#e0e0e0;'>Upload your site coordinates to check for wetland compliance.</div>
+    <div style='font-size:1.1em;margin-top:0.7em;color:#e0e0e0;'>🏠 Check any plot for wetland &amp; water risks before you buy, sell, or build — no GIS files needed; data loads automatically from OpenStreetMap.</div>
     """, unsafe_allow_html=True)
 
 # --- Site Data Input Logic - MOVED TO TOP ---
@@ -210,6 +244,7 @@ st.session_state['processing_mode'] = processing_mode
 
 site_gdf = None
 batch_sites_df = None
+wetlands_gdf = None
 t0 = time.time()
 
 if processing_mode == "Single Site":
@@ -287,6 +322,7 @@ t1 = time.time()
 # --- Wetlands Data Source Selection ---
 st.subheader("Wetlands Data Source 🐸")
 data_source_options = [
+    ("Auto (OpenStreetMap API)", "🌍"),
     ("Local File", "🗂️"),
     ("OGC WFS", "🌐"),
     ("ArcGIS REST API", "🛰️")
@@ -352,7 +388,46 @@ def load_default_wetlands():
 if 'wetlands_gdf' not in st.session_state:
     st.session_state['wetlands_gdf'] = None
     st.session_state['wetlands_loaded'] = False
-if data_source == "Local File":
+if data_source == "Auto (OpenStreetMap API)":
+    # --- Real-estate default: fetch wetlands/water LIVE around the plot ---
+    st.caption("<span style='font-size:1.05em;'>🌍 <b>Auto mode:</b> wetlands, lakes, rivers and streams are fetched live from OpenStreetMap around your plot — no shapefiles needed. Coverage depends on OSM mapping completeness.</span>", unsafe_allow_html=True)
+    if site_gdf is None or site_gdf.empty:
+        st.info("📍 First define your plot above (upload coordinates, or draw it on the map) — wetland data will then be fetched automatically around it.")
+    else:
+        # Plot centroid in WGS84 for the Overpass query
+        site_proj_for_center = site_gdf.to_crs(estimate_utm_crs_for(site_gdf))
+        centroid_proj = union_all_geoseries(site_proj_for_center.geometry).centroid
+        centroid_wgs = gpd.GeoSeries([centroid_proj], crs=site_proj_for_center.crs).to_crs("EPSG:4326").iloc[0]
+        plot_lat, plot_lon = float(centroid_wgs.y), float(centroid_wgs.x)
+
+        search_radius_km = st.slider(
+            "🌍 Search radius around the plot (km)",
+            min_value=1, max_value=10, value=5,
+            help="How far from the plot to look for mapped wetlands & water features."
+        )
+
+        cache_key = (round(plot_lat, 3), round(plot_lon, 3), search_radius_km)
+        cached = st.session_state.get('osm_wetlands_cache')
+        if cached is not None and cached[0] == cache_key:
+            wetlands_gdf = cached[1]
+        else:
+            try:
+                with st.spinner("🌍 Fetching wetlands & water features from OpenStreetMap..."):
+                    wetlands_gdf = fetch_osm_wetlands(plot_lat, plot_lon, radius_m=search_radius_km * 1000)
+            except RuntimeError as fetch_err:
+                st.error(f"❌ Could not fetch OpenStreetMap data: {fetch_err}")
+                st.info("💡 Overpass may be busy — try again in a moment, or use the 'Local File', 'OGC WFS' or 'ArcGIS REST API' sources instead.")
+                wetlands_gdf = None
+            st.session_state['osm_wetlands_cache'] = (cache_key, wetlands_gdf)
+
+        if wetlands_gdf is None:
+            st.warning(f"🦩 No mapped wetlands or water features within {search_radius_km} km of this plot (OpenStreetMap). Low wetland exposure — but OSM coverage varies, so confirm with official NEMA/WRA maps before closing any deal.")
+        else:
+            counts = wetlands_gdf['feature_kind'].value_counts()
+            label_map = [('wetland', 'wetlands'), ('water_body', 'water bodies'), ('waterway', 'waterways')]
+            parts = [f"{counts[key]} {label}" for key, label in label_map if key in counts]
+            st.success(f"🌍 Loaded from OpenStreetMap: {', '.join(parts)} within {search_radius_km} km of your plot.")
+elif data_source == "Local File":
     wetland_input_method = st.radio(
         "How would you like to provide wetlands data?",
         ["🗃️ Use preloaded NEMA wetlands data", "⬆️ Upload your own wetlands data (Shapefile or ZIP)"]
@@ -504,7 +579,7 @@ if site_gdf is not None and not site_gdf.empty and filtered_wetlands_gdf is not 
         st.subheader("Compliance Result 📝")
         if in_wetland:
             # st.error does not support unsafe_allow_html, so use st.markdown for HTML
-            st.error("🚨 Site is located in or overlaps a NEMA wetland! NEMA compliance required. 🐸")
+            st.error("🚨 Plot is located in or overlaps a mapped wetland! Development restricted — NEMA compliance required. 🐸")
             if wetland_names:
                 # Filter out None/empty names
                 clean_names = [w for w in wetland_names if w]
@@ -514,10 +589,19 @@ if site_gdf is not None and not site_gdf.empty and filtered_wetlands_gdf is not 
                     st.markdown("<b>Wetland(s) detected:</b> <span style='color:#1e88e5;font-size:1.15em;font-weight:bold;'>Unnamed Wetland(s)</span> 🦆", unsafe_allow_html=True)
         else:
             # st.success does not support unsafe_allow_html, so use st.markdown for HTML
-            st.success("✅ Site is NOT in a mapped NEMA wetland. 🎉")
+            st.success("✅ Plot is NOT inside a mapped wetland. 🎉")
             # Show distance to nearest wetland more prominently
             if min_distance is not None:
                 st.markdown(f"<div style='font-size:1.15em;margin-top:0.5em;'><b>Distance to nearest wetland:</b> <span style='color:#1e88e5;font-weight:bold;'>{min_distance:,.1f} meters</span></div>", unsafe_allow_html=True)
+        # --- Real-estate decision guidance ---
+        property_guidance = build_property_guidance(in_wetland, min_distance)
+        if property_guidance:
+            st.markdown(
+                "<div style='border:1px solid #555;background:#ffffff10;padding:0.9em;border-radius:8px;margin-top:0.8em;'>"
+                "<b>🏡 What this means for your property decision</b><br><br>" + property_guidance.replace("**", "<b>", 1).replace("**", "</b>", 1) +
+                "</div>",
+                unsafe_allow_html=True,
+            )
         # Collect user input for key sections
         st.subheader("Customize Report Sections ✍️")
         st.caption("<span style='font-size:1.05em;'>All sections below are <b>optional</b>. You can fill in as much or as little as you like, or simply proceed to download the template report.</span>", unsafe_allow_html=True)
@@ -543,7 +627,8 @@ if site_gdf is not None and not site_gdf.empty and filtered_wetlands_gdf is not 
             conclusion=conclusion,
             in_wetland=in_wetland,
             wetland_names=wetland_names,
-            min_distance=min_distance if min_distance is not None else 'N/A'
+            min_distance=min_distance if min_distance is not None else 'N/A',
+            property_guidance=property_guidance
         )
         template_path = os.path.join(os.path.dirname(__file__), 'report_template.md.j2')
         t5 = time.time()

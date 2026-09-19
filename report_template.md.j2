@@ -1,4 +1,4 @@
-# NEMA Uganda Environmental Compliance Report
+# Property Wetland Risk & Compliance Report
 
 **Date:** {{ date }}
 **Number of site features:** {{ num_features }}
@@ -33,6 +33,12 @@
 {% else %}
 **Result:** Site is NOT in a mapped wetland.
 **Distance to nearest wetland:** {{ min_distance|round(2) }} meters
+{% endif %}
+
+{% if property_guidance %}
+**🏡 Property Decision Guidance:**
+
+{{ property_guidance }}
 {% endif %}
 
 ## 5. Environmental Audits and Inspections
