@@ -61,6 +61,7 @@ import io
 from report_logic import check_compliance, calculate_min_distance, render_compliance_report
 from data_sources import load_wetlands_from_file, load_wetlands_from_wfs, load_wetlands_from_arcgis
 from batch_processing import show_batch_processing_ui, process_batch_sites, generate_batch_report
+from geo_utils import union_all_geoseries, estimate_utm_crs_for
 
 # Always define these first!
 site_gdf = None
@@ -303,15 +304,6 @@ for i, (opt, icon) in enumerate(data_source_options):
 data_source = st.session_state['selected_data_source']
 st.caption("<span style='font-size:1.1em;'>💡 <b>Pro Tip:</b> For best performance, use a smaller region or sample of the wetlands database. Large shapefiles may cause slow visualization and distance calculations. 🦦</span>", unsafe_allow_html=True)
 # Memory monitoring for Railway deployment
-def get_memory_usage():
-    """Get current memory usage in MB (simplified for Railway)."""
-    try:
-        import psutil
-        process = psutil.Process(os.getpid())
-        return process.memory_info().rss / 1024 / 1024  # Convert to MB
-    except ImportError:
-        return None  # psutil not available
-
 def load_default_wetlands():
     """Lazy load default wetlands data only when needed."""
     if 'wetlands_gdf' not in st.session_state:
@@ -443,24 +435,16 @@ if wetlands_gdf is not None and not wetlands_gdf.empty:
         st.info(f"🦆 Loaded wetlands database: {len(wetlands_gdf)} features")
     if len(wetlands_gdf) > 60000:
         st.warning("⚠️ Large wetlands dataset detected. Visualization and distance calculations may be slow. Consider using a smaller region or sampling the data. 🐘")
-        folium.GeoJson(filtered_wetlands_gdf, name="Wetlands", style_function=lambda x: {"color": "blue", "weight": 1, "fillOpacity": 0.2}).add_to(m)
-        folium.GeoJson(site_gdf, name="Site", style_function=lambda x: {"color": "red", "weight": 3, "fillOpacity": 0.1}).add_to(m)
-        folium.LayerControl().add_to(m)
-        
-        # Responsive map rendering
-        col1, col2, col3 = st.columns([1, 10, 1])
-        with col2:
-            st_folium(m, width=None, height=400, use_container_width=True)
 # Automatic spatial filtering: only process wetlands near the site (buffered bbox in meters, projected CRS)
 filtered_wetlands_gdf = wetlands_gdf
 if site_gdf is not None and not site_gdf.empty and wetlands_gdf is not None and not wetlands_gdf.empty:
-    # Use UTM Zone 36N for Uganda (EPSG:32636)
-    utm_crs = "EPSG:32636"
+    # Pick the correct UTM zone automatically (36N for Uganda, 36N/37N for Kenya)
+    utm_crs = estimate_utm_crs_for(site_gdf)
     try:
         site_proj = site_gdf.to_crs(utm_crs)
         wetlands_proj = wetlands_gdf.to_crs(utm_crs)
         # Buffer the site by 5000 meters (5km)
-        site_buffer = site_proj.buffer(5000).unary_union
+        site_buffer = union_all_geoseries(site_proj.buffer(5000))
         # Filter wetlands to those that intersect the buffer
         mask = wetlands_proj.intersects(site_buffer)
         filtered_wetlands_gdf = wetlands_gdf[mask.values]
@@ -495,7 +479,7 @@ if site_gdf is not None and not site_gdf.empty and wetlands_gdf is not None and 
         folium.GeoJson(filtered_wetlands_gdf, name="Wetlands", style_function=lambda x: {"color": "blue", "weight": 1, "fillOpacity": 0.2}).add_to(m)
         folium.GeoJson(site_gdf, name="Site", style_function=lambda x: {"color": "red", "weight": 3, "fillOpacity": 0.1}).add_to(m)
         folium.LayerControl().add_to(m)
-        st_folium(m, width=700, height=500)
+        st_folium(m, width=None, height=500, use_container_width=True)
         # st.write(f"[Timing] Visualization: {time.time() - t2:.2f} seconds")
 elif site_gdf is not None and not site_gdf.empty:
     st.info("Wetlands database not loaded. Showing only site features.")
@@ -769,7 +753,11 @@ elif processing_mode == "Batch Processing" and batch_sites_df is not None:
             else:
                 return 'background-color: #fff3cd; color: #856404'
         
-        styled_df = results_df.style.applymap(color_compliance, subset=['compliance_status'])
+        # pandas 2.1+ deprecated Styler.applymap in favor of Styler.map
+        if hasattr(results_df.style, 'map'):
+            styled_df = results_df.style.map(color_compliance, subset=['compliance_status'])
+        else:
+            styled_df = results_df.style.applymap(color_compliance, subset=['compliance_status'])
         st.dataframe(styled_df, use_container_width=True)
         
         # Generate and offer batch report download
@@ -813,9 +801,15 @@ if st.session_state.get('show_feedback', False):
     feedback = st.text_area("Your feedback", max_chars=500, key="feedback_text")
     if st.button("Submit Feedback", key="submit_feedback"):
         if feedback.strip():
-            with open("feedback.txt", "a") as f:
-                f.write(feedback.strip() + "\n---\n")
-            st.success("Thank you for your feedback!")
+            try:
+                with open("feedback.txt", "a", encoding="utf-8") as f:
+                    f.write(feedback.strip() + "\n---\n")
+                st.success("Thank you for your feedback!")
+            except OSError as e:
+                # Read-only filesystems (e.g. some cloud hosts) can't persist files
+                st.info("Thank you for your feedback! (Note: feedback could not be saved to disk in this environment.)")
+                if st.session_state.get('developer_mode', False):
+                    st.warning(f"Feedback save error: {e}")
             st.session_state['show_feedback'] = False
         else:
             st.warning("Please enter some feedback before submitting.")

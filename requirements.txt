@@ -22,6 +22,9 @@ beautifulsoup4>=4.11.0
 # GIS projection support
 pyproj>=3.3.0
 
+# OGC WFS wetlands data source (optional in the UI, imported on demand)
+owslib>=0.26.0
+
 # Additional dependencies for reliable basemap rendering
 pillow>=9.0.0
 rasterio>=1.3.0

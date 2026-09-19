@@ -60,3 +60,11 @@ pip-delete-this-directory.txt
 *.tmp
 *.temp
 .tmp/
+
+# App runtime artifacts
+feedback.txt
+
+# Test / coverage artifacts
+.pytest_cache/
+.coverage
+htmlcov/

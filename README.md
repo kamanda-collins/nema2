@@ -115,7 +115,7 @@ streamlit run app.py
 ### Data Sources
 - **Wetlands**: OpenStreetMap (OSM) water bodies and waterways
 - **Basemaps**: Esri WorldImagery, CartoDB, OpenStreetMap
-- **Projections**: UTM Zone 36N (EPSG:32636) for East Africa
+- **Projections**: Automatic UTM zone selection (36N/37N or southern equivalents) for meter-accurate distances and buffers; EPSG:32636 fallback
 - **Coverage**: Uganda, Kenya, and surrounding regions
 
 ### Performance
@@ -143,6 +143,38 @@ streamlit run app.py
 - Process large batches in smaller chunks
 - Clear browser cache if interface becomes slow
 - Monitor memory usage during batch processing
+
+## 🛠️ Development
+
+### Running Tests
+
+The core compliance logic (wetland intersection detection, distance calculations,
+report rendering, UTM zone selection) is covered by a headless pytest suite:
+
+```bash
+pip install -r requirements-dev.txt
+python -m pytest tests/ -v
+```
+
+### Project Layout (core Python modules)
+
+```
+├── app.py                  # Streamlit application (UI, map, report downloads)
+├── report_logic.py         # Compliance engine: intersection check, distances, report render
+├── geo_utils.py            # GIS helpers: geopandas version compat, automatic UTM zone selection
+├── data_sources.py         # Wetlands loaders (local file, OGC WFS, ArcGIS REST)
+├── batch_processing.py     # Multi-site batch checking + CSV/report generation
+├── static_map_export.py    # High-quality PNG map export (used by the app)
+├── interactive_input.py    # Draw-your-site map with search (Uganda & Kenya)
+├── memory_monitor.py       # Memory usage monitoring for constrained hosts
+├── report_template.md.j2   # Jinja2 template for the compliance report
+└── tests/                  # Headless pytest suite
+```
+
+### Key Behaviors
+- **Distances** are measured from the **site boundary** (not its centroid) to match NEMA buffer guidance.
+- **UTM zones** are selected automatically per site (Uganda: 36N; Kenya: 36N/37N, southern hemisphere zones handled).
+- The compliance check is **fail-safe**: empty or CRS-less uploads return "not in wetland" with a warning instead of crashing.
 
 ## 📞 Support and Documentation
 

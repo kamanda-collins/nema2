@@ -29,7 +29,7 @@ def search_location(query):
             'q': query,
             'format': 'json',
             'limit': 1,
-            'countrycodes': 'ug'  # Focus on Uganda
+            'countrycodes': 'ug,ke'  # Focus on Uganda and Kenya
         }
         headers = {'User-Agent': 'NEMA-Compliance-Checker/1.0'}
         
@@ -61,8 +61,8 @@ def get_geometry_from_map(bounds=None, draw_types=("marker", "polygon", "rectang
     with col1:
         # Location search
         search_query = st.text_input(
-            "🔍 Search for a location in Uganda", 
-            placeholder="e.g., Kampala, Entebbe, Jinja..."
+            "🔍 Search for a location in Uganda or Kenya", 
+            placeholder="e.g., Kampala, Entebbe, Jinja, Nairobi, Kisumu..."
         )
         
         if search_query and st.button("🎯 Go to Location"):

@@ -64,16 +64,17 @@ def export_static_map_png(site_gdf, wetlands_gdf, filename=None, buffer_m=5000, 
         raise ValueError("site_gdf must not be empty")
     if wetlands_gdf is None or wetlands_gdf.empty:
         raise ValueError("wetlands_gdf must not be empty")
-    
-    # Use UTM Zone 36N for Uganda/Kenya
-    utm_crs = "EPSG:32636"
+
+    # Use the correct UTM zone automatically (36N/37N for Uganda/Kenya)
+    from geo_utils import estimate_utm_crs_for, union_all_geoseries
+    utm_crs = estimate_utm_crs_for(site_gdf)
     site_proj = site_gdf.to_crs(utm_crs)
     wetlands_proj = wetlands_gdf.to_crs(utm_crs)
-    
+
     # Create a larger buffer for better context
     context_buffer = buffer_m * 1.5  # 50% larger for context
-    site_buffer = site_proj.buffer(context_buffer).unary_union
-    
+    site_buffer = union_all_geoseries(site_proj.buffer(context_buffer))
+
     # Filter wetlands to those that intersect the buffer
     mask = wetlands_proj.intersects(site_buffer)
     filtered_wetlands = wetlands_proj[mask.values]
