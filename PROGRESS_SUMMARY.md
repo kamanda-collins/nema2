@@ -89,6 +89,46 @@ This document summarizes changes across four implementation sessions:
 - **Cadastral registry**: drop a block/plot GeoPackage at the `cadastral.py` default path to enable Phase 4.2 lookups
 - **Frontend install**: run `npm install` in `webapp/` on a machine with disk headroom, then `npm run build`
 
+## Session 5 — Repo consolidation: rename to `plotscreener` + archive legacy code
+
+### What was done
+1. **Renamed the project** from `nema2` / `NEMA Wetlands Compliance Checker` to
+   **`plotscreener`**. The old name was a leftover from the Streamlit prototype era
+   and no longer described the product (a property due-diligence platform, not a
+   compliance checker). `README.md` now leads with the new name.
+2. **Archived disagreeing code** rather than deleting it, under `archive/`:
+   - `archive/legacy-streamlit/` — `batch_processing.py`, `data_sources.py`,
+     `export_static_map.py`, `memory_monitor.py`, `interactive_input.py`,
+     `static_map_export.py`
+   - `archive/legacy-tests/` — `test_app.py`, `test_map_fix.py`
+   - `archive/legacy-web/` — `public/`, `static/`, `website_integration.html`,
+     `widget_integration.html`, `README-web.md`, `package.json`, `vercel.json`,
+     `setup-github.sh`
+   - `archive/bytecode/` — `__pycache__/` and `.pyc` files
+3. **Made `app.py` robust to the move.** The two top-level imports
+   (`data_sources`, `batch_processing`) were removed and the one remaining call
+   (`show_batch_processing_ui`) is now imported lazily inside the function that
+   uses it — matching the pattern already used for `interactive_input` and
+   `static_map_export`. `main.py`, `api/routes.py`, `api/schemas.py` all still
+   parse cleanly.
+4. **Updated `README.md`** with a Repository Layout table, a Running the full
+   stack section, and an Archived modules section explaining what lives under
+   `archive/` and why.
+
+### What has not worked
+1. **No `npm install` / `next build`** (53.5 MB free on C:). The webapp code is
+   syntax-valid and contract-verified, but a real build still needs to run
+   elsewhere.
+2. **No GitHub remote created yet.** `gh` is not installed on this machine and
+   there is no `GH_TOKEN`/`GITHUB_TOKEN` in the environment, so the new
+   `plotscreener` repo has to be created from the browser. The local commits are
+   ready to push once the remote exists.
+
+## Session 5 Test Results
+- **208/208 Python tests pass** (regression check after the archive move)
+- **17/17 webapp sources pass TypeScript syntax validation**
+- **All frontend ↔ backend contracts match**
+
 ## Session 4 — Phase 2.3 Frontend + Verification Tooling (COMPLETED)
 
 ### Why a new `webapp/` instead of reusing `frontend/`

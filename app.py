@@ -59,8 +59,9 @@ import folium
 from streamlit_folium import st_folium
 import io
 from report_logic import check_compliance, calculate_min_distance, render_compliance_report
-from data_sources import load_wetlands_from_file, load_wetlands_from_wfs, load_wetlands_from_arcgis
-from batch_processing import show_batch_processing_ui, process_batch_sites, generate_batch_report
+# data_sources / batch_processing are legacy Streamlit-era modules now archived in
+# archive/legacy-streamlit/; their functions are imported lazily where used so the
+# FastAPI app and the modern webapp/ never touch them.
 from geo_utils import union_all_geoseries, estimate_utm_crs_for
 from osm_data import fetch_osm_wetlands
 from wetland_cache import (
@@ -419,6 +420,7 @@ elif processing_mode == "Single Site":
         st.button("⬅️ Back to File Upload", on_click=lambda: st.session_state.update({'show_map_input': False}))
 
 else:  # Batch Processing Mode
+    from batch_processing import show_batch_processing_ui
     batch_sites_df = show_batch_processing_ui()
 
 # --- 2. Database Integration Logic ---
