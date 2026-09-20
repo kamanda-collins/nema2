@@ -63,6 +63,25 @@ from data_sources import load_wetlands_from_file, load_wetlands_from_wfs, load_w
 from batch_processing import show_batch_processing_ui, process_batch_sites, generate_batch_report
 from geo_utils import union_all_geoseries, estimate_utm_crs_for
 from osm_data import fetch_osm_wetlands
+from wetland_cache import (
+    load_wetlands_nearby,
+    cache_exists,
+    cache_summary,
+    build_cache,
+    list_official_layers,
+    CACHE_PATH as LOCAL_CACHE_PATH,
+    LAYER_NAME as LOCAL_CACHE_LAYER,
+)
+from risk_score import assess_property_risk
+from location_input import (
+    INPUT_METHODS,
+    lookup_place,
+    parse_coordinates_from_text,
+    plot_polygon_from_point,
+    point_gdf,
+)
+from certificate import build_certificate_pdf, generate_verification_id
+from storage import save_feedback, log_event, save_certificate, stats as storage_stats
 
 # Always define these first!
 site_gdf = None
@@ -152,6 +171,19 @@ def concise(text):
 
 
 # --- Real-estate buyer guidance (plain text, reused in the downloadable report) ---
+def record_plot_centre(site_gdf):
+    """Store the plot's WGS84 centre for caching, scoring and certificates."""
+    try:
+        proj = site_gdf.to_crs(estimate_utm_crs_for(site_gdf))
+        centre = union_all_geoseries(proj.geometry).centroid
+        wgs = gpd.GeoSeries([centre], crs=proj.crs).to_crs("EPSG:4326").iloc[0]
+        st.session_state['plot_lat'] = float(wgs.y)
+        st.session_state['plot_lon'] = float(wgs.x)
+    except Exception as exc:
+        if st.session_state.get('developer_mode'):
+            st.warning(f"Could not derive plot centre: {exc}")
+
+
 def build_property_guidance(in_wetland, min_distance):
     """Translate the compliance result into purchase/development advice."""
     if in_wetland:
@@ -230,6 +262,21 @@ else:
 # --- Site Data Input Logic - MOVED TO TOP ---
 st.caption("<span style='font-size:1.1em;'>⚡ <b>Tip:</b> For best performance, use a small site file or a small area on the interactive map. Large datasets may slow down visualization and distance calculations. 🐢</span>", unsafe_allow_html=True)
 
+# --- Experience mode: property buyers vs environmental consultants (plan 1.1) ---
+if 'experience_mode' not in st.session_state:
+    st.session_state['experience_mode'] = "🏠 Property Check"
+experience_mode = st.radio(
+    "Who are you?",
+    ["🏠 Property Check", "🔬 Consultant / Advanced Mode"],
+    index=0 if st.session_state['experience_mode'].startswith("🏠") else 1,
+    horizontal=True,
+    key="experience_mode_radio",
+    help="Property Check hides GIS jargon and gives a 1-click risk scorecard plus a due "
+         "diligence certificate. Consultant mode exposes all data sources and the full report form."
+)
+st.session_state['experience_mode'] = experience_mode
+property_mode = experience_mode.startswith("🏠")
+
 # Add processing mode selection
 if 'processing_mode' not in st.session_state:
     st.session_state['processing_mode'] = "Single Site"
@@ -247,7 +294,65 @@ batch_sites_df = None
 wetlands_gdf = None
 t0 = time.time()
 
-if processing_mode == "Single Site":
+if processing_mode == "Single Site" and property_mode:
+    # --- Buyer-friendly location input: search, pasted link, or pin/draw (plan 1.1) ---
+    method_labels = [label for label, _ in INPUT_METHODS]
+    method_key_by_label = {label: key for label, key in INPUT_METHODS}
+    method_label = st.radio(
+        "How would you like to locate your plot?",
+        method_labels,
+        horizontal=True,
+        key="property_input_method",
+    )
+    method_key = method_key_by_label[method_label]
+    plot_label = "My Plot"
+
+    if method_key == "search":
+        col_a, col_b = st.columns([3, 1])
+        with col_a:
+            query = st.text_input("Town, estate or landmark",
+                                  placeholder="e.g. Kira, Entebbe, Naivasha, Ruiru")
+        with col_b:
+            st.write("")
+            find_clicked = st.button("Find plot", type="primary")
+        if find_clicked and query:
+            with st.spinner(f"Looking up '{query}'..."):
+                place = lookup_place(query)
+            if place:
+                plot_label = query
+                site_gdf = plot_polygon_from_point(place["lat"], place["lon"], name=query)
+                st.success(f"Found {place['display_name']}")
+            else:
+                st.error("Could not find that place. Try a nearby town, or paste a Google Maps link.")
+
+    elif method_key == "link":
+        link_text = st.text_area(
+            "Paste a Google Maps or WhatsApp location link",
+            placeholder="https://maps.google.com/?q=0.3476,32.5825",
+            height=90,
+            help="Works with Google Maps, WhatsApp location shares, Apple Maps, geo: links, "
+                 "plain 'lat, lon' and DMS coordinates.",
+        )
+        if link_text:
+            coords = parse_coordinates_from_text(link_text)
+            if coords:
+                lat, lon = coords
+                site_gdf = plot_polygon_from_point(lat, lon, name="My Plot")
+                st.success(f"Plot set from link: {lat:.6f}, {lon:.6f}")
+            else:
+                st.error("Could not read coordinates from that link. Copy the full share link and try again.")
+
+    else:  # pin / draw on the map
+        from interactive_input import get_geometry_from_map
+        site_gdf = get_geometry_from_map()
+        if site_gdf is not None and not site_gdf.empty:
+            plot_label = str(site_gdf.iloc[0].get('name', 'My Plot'))
+            st.success("Location captured from the map.")
+
+    if site_gdf is not None and not site_gdf.empty:
+        record_plot_centre(site_gdf)
+        st.session_state['plot_label'] = plot_label
+elif processing_mode == "Single Site":
     # UI state for toggling between file upload and interactive map
     if 'show_map_input' not in st.session_state:
         st.session_state['show_map_input'] = False
@@ -320,25 +425,55 @@ else:  # Batch Processing Mode
 
 t1 = time.time()
 # --- Wetlands Data Source Selection ---
-st.subheader("Wetlands Data Source 🐸")
+if not property_mode:
+    st.subheader("Wetlands Data Source 🐸")
+    st.caption("<span style='font-size:1.05em;'>🌍 Wetland and water data is loaded automatically from the local verified cache and OpenStreetMap — nothing to upload or configure.</span>", unsafe_allow_html=True)
 data_source_options = [
     ("Auto (OpenStreetMap API)", "🌍"),
     ("Local File", "🗂️"),
     ("OGC WFS", "🌐"),
     ("ArcGIS REST API", "🛰️")
 ]
-if 'selected_data_source' not in st.session_state:
-    st.session_state['selected_data_source'] = data_source_options[0][0]
-cols = st.columns(len(data_source_options))
-for i, (opt, icon) in enumerate(data_source_options):
-    is_selected = st.session_state['selected_data_source'] == opt
-    btn_style = "background-color:#1e88e5;color:white;font-weight:900;" if is_selected else ""
-    if cols[i].button(f"{icon} {opt}", key=f"ds_{opt}", help=f"Select {opt}"):
-        st.session_state['selected_data_source'] = opt
-    # Visual highlight for selected
-    cols[i].markdown(f"<div style='height:4px;{'background-color:#1e88e5;' if is_selected else ''}'></div>", unsafe_allow_html=True)
-data_source = st.session_state['selected_data_source']
-st.caption("<span style='font-size:1.1em;'>💡 <b>Pro Tip:</b> For best performance, use a smaller region or sample of the wetlands database. Large shapefiles may cause slow visualization and distance calculations. 🦦</span>", unsafe_allow_html=True)
+if property_mode:
+    # Buyers never choose a data source: the local cache + OSM is used automatically
+    data_source = "Auto (OpenStreetMap API)"
+else:
+    if 'selected_data_source' not in st.session_state:
+        st.session_state['selected_data_source'] = data_source_options[0][0]
+    cols = st.columns(len(data_source_options))
+    for i, (opt, icon) in enumerate(data_source_options):
+        is_selected = st.session_state['selected_data_source'] == opt
+        if cols[i].button(f"{icon} {opt}", key=f"ds_{opt}", help=f"Select {opt}"):
+            st.session_state['selected_data_source'] = opt
+        # Visual highlight for selected
+        cols[i].markdown(f"<div style='height:4px;{'background-color:#1e88e5;' if is_selected else ''}'></div>", unsafe_allow_html=True)
+    data_source = st.session_state['selected_data_source']
+if not property_mode:
+    st.caption("<span style='font-size:1.1em;'>💡 <b>Pro Tip:</b> For best performance, use a smaller region or sample of the wetlands database. Large shapefiles may cause slow visualization and distance calculations. 🦦</span>", unsafe_allow_html=True)
+
+    # --- Local indexed cache status and maintenance (plan 1.2) ---
+    official_layers = list_official_layers()
+    with st.expander(f"🗃️ Local indexed cache — {'ready' if cache_exists() else 'not built yet'}", expanded=False):
+        if cache_exists():
+            summary = cache_summary()
+            st.write("Cached features by source:", summary or "none")
+        else:
+            st.info("No local cache yet. Lookups fall back to the live OpenStreetMap API, and every "
+                    "result is added to the cache so the next lookup is instant.")
+        st.caption(f"Official / curated layers found in data/official/: {len(official_layers)}")
+        if official_layers:
+            for layer in official_layers:
+                st.caption(f"• {os.path.basename(layer)}")
+            if st.button("Compile cache from official layers", key="build_cache_btn"):
+                with st.spinner("Compiling the indexed GeoPackage..."):
+                    _, counts = build_cache(verbose=False)
+                if counts:
+                    st.success(f"Cache rebuilt: {counts}")
+                else:
+                    st.warning("No usable features were found in those layers.")
+        else:
+            st.caption("Drop official NEMA / NWIS / WRA layers into data/official/ to compile them into the "
+                       "cache. Bounding-box reads keep memory low and lookups below 100 ms.")
 # Memory monitoring for Railway deployment
 def load_default_wetlands():
     """Lazy load default wetlands data only when needed."""
@@ -347,31 +482,22 @@ def load_default_wetlands():
         st.session_state['wetlands_loaded'] = False
     
     if not st.session_state.get('wetlands_loaded', False):
-        with st.spinner("Loading default wetlands data..."):
-            default_main = os.path.abspath("wetland_shp/gis_osm_water_a_free_1.shp")
-            default_reinforce = os.path.abspath("wetland_shp/gis_osm_waterways_free_1.shp")
-            
-            try:
-                gdf_main = gpd.read_file(default_main) if os.path.exists(default_main) else None
-            except Exception as e:
-                st.warning(f"Error loading main shapefile: {e}")
-                gdf_main = None
-                
-            try:
-                gdf_reinforce = gpd.read_file(default_reinforce) if os.path.exists(default_reinforce) else None
-            except Exception as e:
-                st.warning(f"Error loading reinforce shapefile: {e}")
-                gdf_reinforce = None
-                
-            if gdf_main is not None and gdf_reinforce is not None:
-                st.session_state['wetlands_gdf'] = pd.concat([gdf_main, gdf_reinforce], ignore_index=True)
-            elif gdf_main is not None:
-                st.session_state['wetlands_gdf'] = gdf_main
-            elif gdf_reinforce is not None:
-                st.session_state['wetlands_gdf'] = gdf_reinforce
-            else:
-                st.session_state['wetlands_gdf'] = None
-                
+        with st.spinner("Loading preloaded wetlands data from the local cache..."):
+            wetlands_loaded = None
+            if cache_exists():
+                try:
+                    wetlands_loaded = gpd.read_file(LOCAL_CACHE_PATH, layer=LOCAL_CACHE_LAYER)
+                except Exception as e:
+                    st.warning(f"Error reading the local cache: {e}")
+                    wetlands_loaded = None
+
+            if wetlands_loaded is None or wetlands_loaded.empty:
+                st.warning(
+                    "No preloaded local cache found. Compile one from official layers (see the "
+                    "local cache panel above), or use Auto (OpenStreetMap API) to fetch data live."
+                )
+                wetlands_loaded = None
+            st.session_state['wetlands_gdf'] = wetlands_loaded
             st.session_state['wetlands_loaded'] = True
             
             # Show memory usage after loading
@@ -409,24 +535,28 @@ if data_source == "Auto (OpenStreetMap API)":
         cache_key = (round(plot_lat, 3), round(plot_lon, 3), search_radius_km)
         cached = st.session_state.get('osm_wetlands_cache')
         if cached is not None and cached[0] == cache_key:
-            wetlands_gdf = cached[1]
+            wetlands_gdf, provenance = cached[1], cached[2]
         else:
             try:
-                with st.spinner("🌍 Fetching wetlands & water features from OpenStreetMap..."):
-                    wetlands_gdf = fetch_osm_wetlands(plot_lat, plot_lon, radius_m=search_radius_km * 1000)
-            except RuntimeError as fetch_err:
-                st.error(f"❌ Could not fetch OpenStreetMap data: {fetch_err}")
-                st.info("💡 Overpass may be busy — try again in a moment, or use the 'Local File', 'OGC WFS' or 'ArcGIS REST API' sources instead.")
-                wetlands_gdf = None
-            st.session_state['osm_wetlands_cache'] = (cache_key, wetlands_gdf)
+                with st.spinner("🌍 Looking up wetlands & water features (local cache, then OpenStreetMap)..."):
+                    wetlands_gdf, provenance = load_wetlands_nearby(
+                        plot_lat, plot_lon, radius_m=search_radius_km * 1000
+                    )
+            except Exception as fetch_err:  # defensive: a data hiccup must never kill the app
+                st.error(f"❌ Could not load wetland data: {fetch_err}")
+                st.info("💡 Try again in a moment, or use the 'Local File', 'OGC WFS' or 'ArcGIS REST API' sources instead.")
+                wetlands_gdf, provenance = None, {"source": "none", "message": str(fetch_err)}
+            st.session_state['osm_wetlands_cache'] = (cache_key, wetlands_gdf, provenance)
 
+        st.session_state['data_provenance'] = provenance
         if wetlands_gdf is None:
-            st.warning(f"🦩 No mapped wetlands or water features within {search_radius_km} km of this plot (OpenStreetMap). Low wetland exposure — but OSM coverage varies, so confirm with official NEMA/WRA maps before closing any deal.")
+            st.warning(f"🦩 No mapped wetlands or water features within {search_radius_km} km of this plot. Low wetland exposure — but coverage varies, so confirm with official NEMA/WRA maps before closing any deal.")
         else:
             counts = wetlands_gdf['feature_kind'].value_counts()
             label_map = [('wetland', 'wetlands'), ('water_body', 'water bodies'), ('waterway', 'waterways')]
             parts = [f"{counts[key]} {label}" for key, label in label_map if key in counts]
-            st.success(f"🌍 Loaded from OpenStreetMap: {', '.join(parts)} within {search_radius_km} km of your plot.")
+            source_note = provenance.get("message") or ""
+            st.success(f"🌍 Loaded {', '.join(parts)} within {search_radius_km} km of your plot. {source_note}")
 elif data_source == "Local File":
     wetland_input_method = st.radio(
         "How would you like to provide wetlands data?",
@@ -602,17 +732,112 @@ if site_gdf is not None and not site_gdf.empty and filtered_wetlands_gdf is not 
                 "</div>",
                 unsafe_allow_html=True,
             )
+
+        # --- Property Risk Scorecard (plan 1.1) --------------------------------
+        centre_lat = st.session_state.get('plot_lat')
+        centre_lon = st.session_state.get('plot_lon')
+        if centre_lat is None or centre_lon is None:
+            try:
+                _proj = site_gdf.to_crs(estimate_utm_crs_for(site_gdf))
+                _centre = union_all_geoseries(_proj.geometry).centroid
+                _wgs = gpd.GeoSeries([_centre], crs=_proj.crs).to_crs("EPSG:4326").iloc[0]
+                centre_lat, centre_lon = float(_wgs.y), float(_wgs.x)
+            except Exception:
+                centre_lat = centre_lon = None
+
+        nearest_feature_kind = None
+        try:
+            from shapely.geometry import Point as _Point
+            if filtered_wetlands_gdf is not None and not filtered_wetlands_gdf.empty and centre_lat is not None:
+                _utm = estimate_utm_crs_for(site_gdf)
+                _pt = gpd.GeoSeries([_Point(centre_lon, centre_lat)], crs="EPSG:4326").to_crs(_utm).iloc[0]
+                _wet_proj = filtered_wetlands_gdf.to_crs(_utm)
+                _dists = _wet_proj.geometry.distance(_pt)
+                _near = _dists.idxmin()
+                if 'feature_kind' in _wet_proj.columns:
+                    nearest_feature_kind = _wet_proj.loc[_near, 'feature_kind']
+        except Exception:
+            nearest_feature_kind = None
+
+        risk = assess_property_risk(
+            in_wetland, min_distance, feature_kind=nearest_feature_kind,
+            lat=centre_lat, lon=centre_lon,
+        )
+        st.session_state['risk'] = risk
+        st.session_state['nearest_feature_kind'] = nearest_feature_kind
+        log_event("assessment", risk.to_dict())
+
+        st.markdown(
+            f"<div style='border:2px solid {risk.color};border-radius:10px;padding:0.9em;margin:0.8em 0;'>"
+            f"<span style='font-size:1.35em;font-weight:900;color:{risk.color};'>{risk.emoji} {risk.score}/100</span>"
+            f"<span style='font-size:1.05em;font-weight:700;color:{risk.color};'> &nbsp;{risk.label}</span><br>"
+            f"<span style='font-size:1.02em;color:#eaeaea;'><b>{risk.headline}</b></span><br>"
+            f"<span style='font-size:0.95em;color:#d8d8d8;'>{risk.guidance}</span>"
+            f"</div>",
+            unsafe_allow_html=True,
+        )
+
+        # --- Due Diligence Certificate (plan 1.3) ------------------------------
+        cert_id = generate_verification_id(centre_lat, centre_lon, risk.band)
+        if st.button("📄 Generate Due Diligence Certificate (PDF)", type="primary", key="cert_btn"):
+            try:
+                with st.spinner("Rendering the certificate..."):
+                    pdf_bytes = build_certificate_pdf(
+                        certificate_id=cert_id,
+                        risk=risk,
+                        site_label=st.session_state.get('plot_label', 'Plot'),
+                        lat=centre_lat,
+                        lon=centre_lon,
+                        distance_m=min_distance,
+                        wetland_names=wetland_names,
+                        feature_kind=nearest_feature_kind,
+                        site_gdf=site_gdf,
+                        wetlands_gdf=filtered_wetlands_gdf,
+                        provenance=st.session_state.get('data_provenance'),
+                    )
+                save_certificate(cert_id, {
+                    "score": risk.score, "band": risk.band, "country": risk.country,
+                    "lat": centre_lat, "lon": centre_lon,
+                })
+                log_event("certificate_issued", {"certificate_id": cert_id, **risk.to_dict()})
+                st.session_state['cert_pdf'] = pdf_bytes
+                st.session_state['cert_id'] = cert_id
+                st.success(f"Certificate {cert_id} ready — a verification record was saved.")
+            except Exception as cert_err:
+                st.error(f"Certificate generation failed: {cert_err}")
+        if st.session_state.get('cert_pdf'):
+            st.download_button(
+                "⬇️ Download Due Diligence Certificate (PDF)",
+                data=st.session_state['cert_pdf'],
+                file_name=f"{st.session_state.get('cert_id', 'certificate')}.pdf",
+                mime="application/pdf",
+                key="cert_download",
+            )
         # Collect user input for key sections
-        st.subheader("Customize Report Sections ✍️")
-        st.caption("<span style='font-size:1.05em;'>All sections below are <b>optional</b>. You can fill in as much or as little as you like, or simply proceed to download the template report.</span>", unsafe_allow_html=True)
-        executive_summary = st.text_area("📝 Executive Summary", "Brief overview of the project/operation.")
-        purpose = st.text_input("🎯 Purpose of the Report", "To demonstrate adherence to NEMA regulations.")
-        project_description = st.text_area("🏗️ Project/Operation Description", "Description of business activities, location, and scale.")
-        ems_overview = st.text_area("🌱 EMS Overview", "Describe the organizational structure for environmental management.")
-        audits_summary = st.text_area("🔍 Audits and Inspections Summary", "Summary of audits conducted and findings.")
-        community_engagement = st.text_area("🤝 Community Engagement", "Description of engagement with local communities.")
-        challenges = st.text_area("🚧 Challenges and Future Plans", "Key environmental challenges and future plans.")
-        conclusion = st.text_area("✅ Conclusion", "Overall statement on the project's environmental compliance status.")
+        if property_mode:
+            # Buyers get a one-page report pre-filled from the assessment - no EMS form
+            executive_summary = (
+                f"Automated wetland and water proximity screening for {st.session_state.get('plot_label', 'the plot')} "
+                f"({centre_lat:.5f}, {centre_lon:.5f})."
+            )
+            purpose = "To document wetland proximity risk for a property purchase decision."
+            project_description = "Residential / investment plot screening (pre-purchase due diligence)."
+            ems_overview = "Not applicable to this screening report."
+            audits_summary = "Not applicable to this screening report."
+            community_engagement = "Not applicable to this screening report."
+            challenges = "Not applicable to this screening report."
+            conclusion = risk.guidance
+        else:
+            st.subheader("Customize Report Sections ✍️")
+            st.caption("<span style='font-size:1.05em;'>All sections below are <b>optional</b>. You can fill in as much or as little as you like, or simply proceed to download the template report.</span>", unsafe_allow_html=True)
+            executive_summary = st.text_area("📝 Executive Summary", "Brief overview of the project/operation.")
+            purpose = st.text_input("🎯 Purpose of the Report", "To demonstrate adherence to NEMA regulations.")
+            project_description = st.text_area("🏗️ Project/Operation Description", "Description of business activities, location, and scale.")
+            ems_overview = st.text_area("🌱 EMS Overview", "Describe the organizational structure for environmental management.")
+            audits_summary = st.text_area("🔍 Audits and Inspections Summary", "Summary of audits conducted and findings.")
+            community_engagement = st.text_area("🤝 Community Engagement", "Description of engagement with local communities.")
+            challenges = st.text_area("🚧 Challenges and Future Plans", "Key environmental challenges and future plans.")
+            conclusion = st.text_area("✅ Conclusion", "Overall statement on the project's environmental compliance status.")
         # Render the report
         context = dict(
             date=pd.Timestamp.now().strftime('%Y-%m-%d'),
@@ -886,15 +1111,13 @@ if st.session_state.get('show_feedback', False):
     feedback = st.text_area("Your feedback", max_chars=500, key="feedback_text")
     if st.button("Submit Feedback", key="submit_feedback"):
         if feedback.strip():
-            try:
-                with open("feedback.txt", "a", encoding="utf-8") as f:
-                    f.write(feedback.strip() + "\n---\n")
-                st.success("Thank you for your feedback!")
-            except OSError as e:
+            saved_id = save_feedback(feedback, meta={"mode": st.session_state.get('experience_mode')})
+            log_event("feedback", {"length": len(feedback.strip())})
+            if saved_id is not None:
+                st.success("Thank you for your feedback! It has been recorded.")
+            else:
                 # Read-only filesystems (e.g. some cloud hosts) can't persist files
-                st.info("Thank you for your feedback! (Note: feedback could not be saved to disk in this environment.)")
-                if st.session_state.get('developer_mode', False):
-                    st.warning(f"Feedback save error: {e}")
+                st.info("Thank you for your feedback! (Note: storage is unavailable in this environment.)")
             st.session_state['show_feedback'] = False
         else:
             st.warning("Please enter some feedback before submitting.")

@@ -21,6 +21,15 @@ Example usage:
 """
 import geopandas as gpd
 import pandas as pd
+
+# Server-side rendering: force a headless backend so image export never
+# depends on a GUI toolkit (Tk/Qt) being available.
+import matplotlib
+try:
+    matplotlib.use("Agg", force=False)
+except Exception:
+    pass
+
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 import matplotlib.patheffects as path_effects

@@ -4,6 +4,51 @@ A Streamlit web application for wetland & water risk checks on land in Uganda an
 
 It remains useful for environmental consultants and regulators doing rapid NEMA screening of development sites near sensitive wetland ecosystems.
 
+## Repository Layout
+
+The project now ships three coordinated surfaces on top of one shared analysis core:
+
+| Path | Surface | Purpose |
+| --- | --- | --- |
+| `app.py` | Streamlit | The original interactive desktop/analyst experience |
+| `main.py`, `api/` | FastAPI | Headless REST API — plot screening, PDF certificates, billing, payments |
+| `webapp/` | Next.js 14 | Mobile-first due-diligence app (MapLibre GL, no iframe) |
+| `public/` | Static | Legacy embed/hosted landing page |
+
+Shared analysis modules used by all three: `risk_score.py` (0-100 traffic-light
+scorecard), `location_input.py` (landmark / map-link / DMS / coordinate parsing),
+`certificate.py` (2-page stamped PDF with QR + buffer-ring map), `storage.py`
+(SQLite), `wetland_cache.py` (indexed GeoPackage), `spatial_db.py` (optional
+PostGIS), `osm_data.py` (Overpass), `flood_risk.py` (Copernicus DEM),
+`branding.py` (white-label), `cadastral.py` (block/plot registry).
+
+### Running the full stack
+
+```bash
+# 1. Backend API (screening, certificates, billing)
+pip install -r requirements.txt
+uvicorn main:app --reload --port 8000
+
+# 2. Web app
+cd webapp && npm install && npm run dev      # http://localhost:3000
+
+# 3. Original Streamlit app (optional)
+streamlit run app.py
+```
+
+Optional infrastructure — Redis (Celery worker/scheduler), PostGIS (faster
+spatial queries) and payment gateway credentials — is **optional by design**:
+without it the API degrades gracefully (`DISABLE_POSTGIS=1`, `not_configured`,
+`unavailable`) instead of failing.
+
+### Validation
+
+```bash
+python -m pytest tests/ -q                    # 208 tests
+node tools/check_webapp_syntax.mjs            # TypeScript syntax for webapp/
+python tools/verify_webapp_contract.py        # frontend <-> backend contract
+```
+
 ## 🌍 What This App Does
 
 ### Core Functionality

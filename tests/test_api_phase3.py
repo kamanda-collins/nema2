@@ -1,0 +1,280 @@
+"""
+tests/test_api_phase3.py
+
+API-level tests for the Phase 3 monetization features:
+- Billing plans + API key registration endpoints (Phase 3.2)
+- Quota enforcement (401/402/429) on assess & report endpoints (Phase 3.2)
+- Payment initiation/status/activation flow (Phase 3.1)
+- Flood risk endpoint (Phase 3.3)
+"""
+
+import sqlite3
+
+import pytest
+from fastapi.testclient import TestClient
+
+import storage
+import payments as payment_gateway
+from main import app
+from api import routes as api_routes
+
+client = TestClient(app)
+
+
+@pytest.fixture(autouse=True)
+def isolated_db(monkeypatch, tmp_path):
+    """Point the SQLite layer at a throwaway database for every test."""
+    db_path = str(tmp_path / "app_data.db")
+    monkeypatch.setattr(storage, "DEFAULT_DB_PATH", db_path)
+    yield db_path
+
+
+# --- Billing catalog & keys ---------------------------------------------------------
+
+def test_billing_plans_endpoint():
+    resp = client.get("/api/v1/billing/plans")
+    assert resp.status_code == 200
+    plans = resp.json()["plans"]
+    assert set(plans.keys()) == {"free", "instant", "pro", "law_firm"}
+    assert plans["instant"]["certificates"] is True
+
+
+def test_register_api_key_endpoint():
+    resp = client.post(
+        "/api/v1/billing/api-keys",
+        json={"name": "Test Agency", "tier": "pro"},
+    )
+    assert resp.status_code == 200
+    record = resp.json()["api_key"]
+    assert record["key"].startswith("nema_")
+    assert record["tier"] == "pro"
+
+
+def test_register_api_key_rejects_unknown_tier():
+    resp = client.post("/api/v1/billing/api-keys", json={"name": "XY", "tier": "diamond"})
+    assert resp.status_code == 400
+
+
+def test_invalid_api_key_is_401():
+    resp = client.post(
+        "/api/v1/assess-plot",
+        json={"lat": 0.35, "lon": 32.6},
+        headers={"X-API-Key": "nema_unknown"},
+    )
+    assert resp.status_code == 401
+
+
+# --- Quota enforcement ----------------------------------------------------------------
+
+def _make_exhausted_key(db_path, tier="free", used=10_000):
+    record = storage.create_api_key("Exhausted", tier=tier, db_path=db_path)
+    with sqlite3.connect(db_path) as conn:
+        conn.execute(
+            "UPDATE api_keys SET requests_used = ? WHERE key = ?",
+            (used, record["key"]),
+        )
+    return record["key"]
+
+
+def test_assess_plot_blocks_exhausted_key_with_429(isolated_db):
+    key = _make_exhausted_key(isolated_db, tier="free", used=5)  # free limit = 5
+    resp = client.post(
+        "/api/v1/assess-plot",
+        json={"lat": 0.35, "lon": 32.6},
+        headers={"X-API-Key": key},
+    )
+    assert resp.status_code == 429
+    assert "quota" in resp.json()["detail"].lower()
+
+
+def test_assess_plot_allows_within_quota_and_records_usage(isolated_db):
+    record = storage.create_api_key("Counter", tier="free", db_path=isolated_db)
+    resp = client.post(
+        "/api/v1/assess-plot",
+        json={"lat": 0.35, "lon": 32.6},
+        headers={"X-API-Key": record["key"]},
+    )
+    assert resp.status_code == 200
+    fetched = storage.get_api_key(record["key"], db_path=isolated_db)
+    assert fetched["requests_used"] == 1
+
+
+def test_usage_endpoint_reports_quota(isolated_db):
+    record = storage.create_api_key("Dashboard", tier="pro", db_path=isolated_db)
+    client.post(
+        "/api/v1/assess-plot",
+        json={"lat": 0.35, "lon": 32.6},
+        headers={"X-API-Key": record["key"]},
+    )
+    resp = client.get("/api/v1/billing/usage", headers={"X-API-Key": record["key"]})
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["status"] == "ok"
+    assert data["tier"] == "pro"
+    assert data["requests_used"] == 1
+    assert data["remaining"] == 29
+    assert data["last_used_at"] is not None
+
+
+def test_usage_endpoint_rejects_unknown_key():
+    resp = client.get("/api/v1/billing/usage", headers={"X-API-Key": "nema_nope"})
+    assert resp.status_code == 401
+
+
+def test_free_tier_key_cannot_generate_certificates_402(isolated_db):
+    record = storage.create_api_key("Freebie", tier="free", db_path=isolated_db)
+    resp = client.post(
+        "/api/v1/reports/generate",
+        json={"lat": 0.3476, "lon": 32.5825},
+        headers={"X-API-Key": record["key"]},
+    )
+    assert resp.status_code == 402
+    assert "paid plan" in resp.json()["detail"]
+
+
+def test_pro_tier_key_can_generate_certificates(isolated_db):
+    record = storage.create_api_key("Pro User", tier="pro", db_path=isolated_db)
+    resp = client.post(
+        "/api/v1/reports/generate",
+        json={"lat": 0.3476, "lon": 32.5825},
+        headers={"X-API-Key": record["key"]},
+    )
+    assert resp.status_code == 200
+    assert resp.json()["certificate_id"].startswith("NEMA-")
+    fetched = storage.get_api_key(record["key"], db_path=isolated_db)
+    assert fetched["requests_used"] == 1
+
+
+# --- Payments -----------------------------------------------------------------------------
+
+def test_payment_initiation_degrades_without_credentials():
+    resp = client.post(
+        "/api/v1/payments/initiate",
+        json={"plan_id": "instant", "provider": "pesapal", "email": "u@x.com"},
+    )
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["status"] == "not_configured"
+    assert data["provider"] == "pesapal"
+
+
+def test_payment_initiation_rejects_free_plan():
+    resp = client.post("/api/v1/payments/initiate", json={"plan_id": "free"})
+    assert resp.status_code == 400
+
+
+def test_payment_initiation_rejects_unknown_plan():
+    resp = client.post("/api/v1/payments/initiate", json={"plan_id": "gold"})
+    assert resp.status_code == 400
+
+
+def test_payment_status_endpoint_without_credentials():
+    resp = client.get("/api/v1/payments/status/pesapal/TRACK-1")
+    assert resp.status_code == 200
+    assert resp.json()["status"] == "not_configured"
+
+
+def test_activate_refuses_unconfirmed_payment(isolated_db, monkeypatch):
+    record = storage.create_api_key("Late Buyer", tier="free", db_path=isolated_db)
+    monkeypatch.setattr(
+        payment_gateway,
+        "check_payment_status",
+        lambda provider, tx: {"status": "pending", "provider": provider},
+    )
+    resp = client.post(
+        "/api/v1/billing/activate",
+        params={
+            "api_key": record["key"],
+            "plan_id": "pro",
+            "provider": "pesapal",
+            "transaction_id": "TRACK-2",
+        },
+    )
+    assert resp.status_code == 200
+    assert resp.json()["status"] == "pending"
+    assert storage.get_api_key(record["key"], db_path=isolated_db)["tier"] == "free"
+
+
+def test_activate_upgrades_after_confirmed_payment(isolated_db, monkeypatch):
+    record = storage.create_api_key("Happy Buyer", tier="free", db_path=isolated_db)
+    monkeypatch.setattr(
+        payment_gateway,
+        "check_payment_status",
+        lambda provider, tx: {"status": "completed", "provider": provider},
+    )
+    resp = client.post(
+        "/api/v1/billing/activate",
+        params={
+            "api_key": record["key"],
+            "plan_id": "law_firm",
+            "provider": "flutterwave",
+            "transaction_id": "TX-9",
+        },
+    )
+    assert resp.status_code == 200
+    assert resp.json()["status"] == "activated"
+    assert storage.get_api_key(record["key"], db_path=isolated_db)["tier"] == "law_firm"
+
+
+def test_activate_rejects_unknown_key(isolated_db, monkeypatch):
+    monkeypatch.setattr(
+        payment_gateway,
+        "check_payment_status",
+        lambda provider, tx: {"status": "completed", "provider": provider},
+    )
+    resp = client.post(
+        "/api/v1/billing/activate",
+        params={
+            "api_key": "nema_nope",
+            "plan_id": "pro",
+            "provider": "pesapal",
+            "transaction_id": "T",
+        },
+    )
+    assert resp.status_code == 401
+
+
+# --- Flood risk endpoint --------------------------------------------------------------------
+
+def test_flood_risk_endpoint_available(monkeypatch):
+    monkeypatch.setattr(
+        api_routes,
+        "flood_risk_assessment",
+        lambda lat, lon, width_m=30.0, length_m=30.0: {
+            "status": "available",
+            "susceptibility_index": 22,
+            "band": "Moderate",
+        },
+    )
+    resp = client.post("/api/v1/flood-risk", json={"lat": 0.35, "lon": 32.6})
+    assert resp.status_code == 200
+    assert resp.json()["band"] == "Moderate"
+
+
+def test_flood_risk_endpoint_unavailable_is_200(monkeypatch):
+    monkeypatch.setattr(
+        api_routes,
+        "flood_risk_assessment",
+        lambda lat, lon, width_m=30.0, length_m=30.0: {
+            "status": "unavailable",
+            "reason": "elevation_service_unreachable",
+        },
+    )
+    resp = client.post("/api/v1/flood-risk", json={"lat": 0.35, "lon": 32.6})
+    assert resp.status_code == 200
+    assert resp.json()["status"] == "unavailable"
+
+
+def test_flood_risk_endpoint_validates_input():
+    resp = client.post("/api/v1/flood-risk", json={"lat": 99.0, "lon": 32.6})
+    assert resp.status_code == 422  # ge constraint
+
+
+# --- Ops --------------------------------------------------------------------------------------
+
+def test_admin_cleanup_endpoint(isolated_db):
+    storage.save_certificate("NEMA-KEEP", {"score": 80, "band": "SAFE"}, db_path=isolated_db)
+    resp = client.post("/api/v1/admin/cleanup-certificates", params={"days": 90})
+    assert resp.status_code == 200
+    assert resp.json()["removed"] >= 0
+

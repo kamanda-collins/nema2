@@ -64,7 +64,19 @@ pip-delete-this-directory.txt
 # App runtime artifacts
 feedback.txt
 
+# Generated local data (wetland cache, SQLite DB) - rebuildable
+data/*.gpkg
+data/*.db
+data/*.sqlite
+
 # Test / coverage artifacts
 .pytest_cache/
 .coverage
 htmlcov/
+
+# Tooling scratch output (tools/check_webapp_syntax.mjs, verify_webapp_contract.py)
+tools/*_out.txt
+tools/*.log
+
+# Legacy clone of the geo-shape-capture-portal exploration (superseded by webapp/)
+frontend/bun.lockb

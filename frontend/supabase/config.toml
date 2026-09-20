@@ -1,0 +1,8 @@
+
+project_id = "xeohypupypohmgahlugl"
+
+[functions.send-notification]
+verify_jwt = false
+
+[functions.send-thankyou-email]
+verify_jwt = false
