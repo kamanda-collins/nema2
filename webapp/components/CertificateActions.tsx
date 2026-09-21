@@ -12,10 +12,12 @@ import type { AssessPlotResponse, BrandingPayload, VerifyResponse } from "@/lib/
 import BrandingForm from "./BrandingForm";
 
 /**
- * Certificate issuance + WhatsApp share kit.
- * Free/anonymous callers hit the 402 paywall and are pointed at /pricing.
+ * Professional reports remain unavailable until dataset and reviewer controls
+ * are operational. The public product is a preliminary screening, not a
+ * clearance or transferable certificate.
  */
 export default function CertificateActions({ result }: { result: AssessPlotResponse }) {
+  const reportIssuanceAvailable = false;
   const [branding, setBranding] = useState<BrandingPayload | null>(null);
   const [showBranding, setShowBranding] = useState(false);
   const [certId, setCertId] = useState<string | null>(null);
@@ -78,23 +80,24 @@ export default function CertificateActions({ result }: { result: AssessPlotRespo
   }
 
   const shareText = encodeURIComponent(
-    `Wetland due-diligence screening: ${risk.band} (score ${risk.score}/100) for ${location.label}. ` +
-      `${risk.headline} - verified via the NEMA Wetland Due Diligence portal.`,
+    `Preliminary wetland-risk screen for ${location.label}. ${risk.headline} ` +
+      `This is not a clearance or survey.`,
   );
 
   return (
     <div className="card space-y-4">
       <div>
-        <p className="label">Due-diligence certificate</p>
+        <p className="label">Professional review</p>
         <p className="text-sm text-slate-600">
-          A 2-page stamped PDF with the buffer-ring map, statutory citations and a QR code for
-          third-party verification.
+          Downloadable reports are paused while verified-source coverage, reviewer workflow and
+          privacy controls are completed. Save this screening and use it to brief a registered
+          surveyor, environmental practitioner or the relevant authority.
         </p>
       </div>
 
       <div className="flex flex-wrap gap-2">
-        <button className="btn-primary" onClick={issue} disabled={busy}>
-          {busy ? "Issuing..." : certId ? "Re-issue certificate" : "Issue PDF certificate"}
+        <button className="btn-primary" onClick={issue} disabled={busy || !reportIssuanceAvailable} title="Reports are not available during the pilot">
+          Professional report coming soon
         </button>
 
         {!certId && (
@@ -110,11 +113,10 @@ export default function CertificateActions({ result }: { result: AssessPlotRespo
         <div className="rounded-lg border border-risk-caution/40 bg-risk-caution/5 p-3 text-xs">
           <p className="font-semibold text-risk-caution">Upgrade required</p>
           <p className="mt-1 text-slate-600">
-            The free preview shows the on-screen traffic light. PDF certificates need the Instant,
-            Pro Realtor or Law Firm pack.
+            Professional reports are not yet available for self-service purchase.
           </p>
           <a href="/pricing" className="mt-2 inline-block font-semibold text-brand underline">
-            View pricing &amp; pay with Mobile Money
+            View pilot access information
           </a>
         </div>
       )}

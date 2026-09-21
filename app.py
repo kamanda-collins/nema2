@@ -237,7 +237,7 @@ if os.path.exists(logo_path):
     st.markdown(f"""
     <div class='header-container' style='display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;'>
         <div style='display:flex;align-items:center;gap:14px;flex-wrap:wrap;'>
-            <h1 style="margin-bottom:0;font-size:2.1em;color:#fff;font-weight:900;letter-spacing:0.5px;">NEMA Compliance Checker</h1>
+            <h1 style="margin-bottom:0;font-size:2.1em;color:#fff;font-weight:900;letter-spacing:0.5px;">Wetland Risk Screen</h1>
             <span style='background:#1e88e5;color:#fff;padding:3px 12px;border-radius:14px;font-size:0.55em;font-weight:700;letter-spacing:1px;vertical-align:middle;'>🏠 REAL ESTATE EDITION</span>
             <img src='https://upload.wikimedia.org/wikipedia/commons/4/4e/Flag_of_Uganda.svg' width='36' style='border-radius:6px;border:1.5px solid #222;'>
         </div>
@@ -252,7 +252,7 @@ else:
     # Fallback without logo
     st.markdown("""
     <div class='header-container' style='display:flex;align-items:center;gap:14px;flex-wrap:wrap;'>
-      <h1 style="margin-bottom:0;font-size:2.1em;color:#fff;font-weight:900;letter-spacing:0.5px;">NEMA Compliance Checker</h1>
+      <h1 style="margin-bottom:0;font-size:2.1em;color:#fff;font-weight:900;letter-spacing:0.5px;">Wetland Risk Screen</h1>
       <span style='background:#1e88e5;color:#fff;padding:3px 12px;border-radius:14px;font-size:0.55em;font-weight:700;letter-spacing:1px;vertical-align:middle;'>🏠 REAL ESTATE EDITION</span>
       <img src='https://upload.wikimedia.org/wikipedia/commons/4/4e/Flag_of_Uganda.svg' width='36' style='border-radius:6px;border:1.5px solid #222;'>
     </div>
@@ -781,7 +781,10 @@ if site_gdf is not None and not site_gdf.empty and filtered_wetlands_gdf is not 
 
         # --- Due Diligence Certificate (plan 1.3) ------------------------------
         cert_id = generate_verification_id(centre_lat, centre_lon, risk.band)
-        if st.button("📄 Generate Due Diligence Certificate (PDF)", type="primary", key="cert_btn"):
+        reports_enabled = os.getenv("ENABLE_PROFESSIONAL_REPORTS", "false").lower() == "true"
+        if not reports_enabled:
+            st.info("Professional reports are paused while verified-source coverage and reviewer controls are completed. This screen is not clearance.")
+        if st.button("📄 Generate preliminary professional report (PDF)", type="primary", key="cert_btn", disabled=not reports_enabled):
             try:
                 with st.spinner("Rendering the certificate..."):
                     pdf_bytes = build_certificate_pdf(

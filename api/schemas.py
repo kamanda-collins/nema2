@@ -54,7 +54,7 @@ class FeedbackRequest(BaseModel):
 
 class ApiKeyRequest(BaseModel):
     name: str = Field(..., min_length=2, max_length=80, description="Owner label, e.g. agency or app name")
-    tier: str = Field("free", description="Pricing tier: free | instant | pro | law_firm")
+    tier: str = Field("free", description="Only the free tier can be self-registered. Paid access is provisioned after a verified payment.")
 
 
 class ApiKeyResponse(BaseModel):

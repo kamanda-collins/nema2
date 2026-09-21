@@ -1,7 +1,7 @@
 """
 certificate.py
 
-Bank-grade PDF certificate and buffer-ring map generation (plan Phase 1.3):
+Indicative preliminary-screening PDF and buffer-ring map generation:
 - Stable verification ID generation and digital lookup URL
 - Matplotlib-based static buffer-ring map with site footprint and wetlands
 - Multi-page branded PDF certificate via ReportLab with risk gauges, statutory breakdown,
@@ -10,6 +10,7 @@ Bank-grade PDF certificate and buffer-ring map generation (plan Phase 1.3):
 
 import hashlib
 import io
+import os
 import re
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Union
@@ -70,7 +71,8 @@ def generate_verification_id(
 
 def verification_url(certificate_id: str) -> str:
     """Return the online verification URL for this certificate."""
-    return f"https://nema.kamandalabs.me/verify/{certificate_id}"
+    base_url = os.getenv("PUBLIC_WEB_URL", "http://localhost:3000").rstrip("/")
+    return f"{base_url}/verify/{certificate_id}"
 
 
 def render_site_map_png(
@@ -159,7 +161,7 @@ def build_certificate_pdf(
     include_map: bool = True,
     branding: Optional[Dict[str, Any]] = None,
 ) -> bytes:
-    """Generate an official 2-page bank-grade Property Due Diligence Certificate."""
+    """Generate an indicative preliminary-screening PDF for professional review."""
     from branding import AgencyBranding, validate_branding
 
     brand: AgencyBranding = validate_branding(branding)
@@ -268,7 +270,7 @@ def build_certificate_pdf(
             Paragraph("<b>🌿 NEMA COMPLIANCE & PROPERTY DUE DILIGENCE</b>", title_style),
         ],
         [
-            Paragraph("OFFICIAL ENVIRONMENTAL & WETLAND SETBACK CLEARANCE SCREENING", subtitle_style),
+            Paragraph("INDICATIVE MAPPED-DATA SCREENING — NOT CLEARANCE OR A SURVEY", subtitle_style),
         ],
     ]
     header_table = Table(header_table_data, colWidths=[174 * mm])
@@ -341,7 +343,7 @@ def build_certificate_pdf(
         [Paragraph("GPS Coordinates (WGS84)", body_style), Paragraph(f"Latitude: {lat_str} | Longitude: {lon_str}", body_style)],
         [Paragraph("Nearest Water / Wetland", body_style), Paragraph(names_str, body_style)],
         [Paragraph("Distance from Site Edge", body_style), Paragraph(f"<b>{dist_str}</b>", body_style)],
-        [Paragraph("Statutory Required Buffer", body_style), Paragraph(f"<b>{buffer_m} meters</b> (Statutory Protection Zone)", body_style)],
+        [Paragraph("Reference Buffer", body_style), Paragraph(f"<b>{buffer_m} meters</b> (confirm with the responsible authority)", body_style)],
     ]
     prop_table = Table(prop_data, colWidths=[60 * mm, 114 * mm])
     prop_table.setStyle(
@@ -360,7 +362,7 @@ def build_certificate_pdf(
 
     # Satellite / Map section on Page 1
     if include_map:
-        elements.append(Paragraph("<b>2. Spatial Buffer Verification Map</b>", section_h1))
+        elements.append(Paragraph("<b>2. Mapped Feature Context Map</b>", section_h1))
         # If site_gdf is None but lat/lon provided, create a dummy point gdf
         effective_site = site_gdf
         if (effective_site is None or effective_site.empty) and (lat is not None and lon is not None):
@@ -377,7 +379,7 @@ def build_certificate_pdf(
     # --- PAGE 2: STATUTORY ANALYSIS & RECOMMENDATIONS ---
     elements.append(PageBreak())
 
-    elements.append(Paragraph("<b>3. Statutory Compliance & Legal Assessment</b>", section_h1))
+    elements.append(Paragraph("<b>3. Preliminary Regulatory Considerations</b>", section_h1))
 
     # Compliance matrix
     in_buffer = in_wetland or (distance_m is not None and distance_m < buffer_m)
@@ -430,12 +432,12 @@ def build_certificate_pdf(
     elements.append(Paragraph(ref_lines, body_style))
     elements.append(Spacer(1, 4 * mm))
 
-    # Official Digital Seal & Verification Box
-    qr_placeholder_text = f"<b>DIGITAL VERIFICATION SEAL</b><br/>Certificate ID: {certificate_id}<br/>Scan or visit: {verify_url}<br/>Cryptographic Token: Verified Match"
-    stamp_line2 = brand.agency_tagline or "Automated Due Diligence Engine v2.0"
+    # Digital record box; it verifies report issuance, not a legal clearance.
+    qr_placeholder_text = f"<b>DIGITAL RECORD</b><br/>Report ID: {certificate_id}<br/>Scan or visit: {verify_url}<br/>Preliminary screen only"
+    stamp_line2 = brand.agency_tagline or "Preliminary mapped-data screening"
     stamp_text = (
         f"<b>{brand.agency_name.upper()}</b><br/><i>{stamp_line2}</i><br/>"
-        "Official clearance requires field verification."
+        "This record is not an authority clearance; field verification is required."
     )
     if brand.disclaimer_extra:
         stamp_text += f"<br/>{brand.disclaimer_extra}"

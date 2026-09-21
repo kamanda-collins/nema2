@@ -1,5 +1,7 @@
 """API Router for NEMA Compliance REST endpoints."""
 
+import os
+import secrets
 from typing import Any, Dict, Optional
 
 from fastapi import APIRouter, Header, HTTPException, Request, Response
@@ -27,7 +29,7 @@ from location_input import (
     lookup_place,
     plot_polygon_from_point,
 )
-from wetland_cache import load_wetlands_nearby, cache_summary
+from wetland_cache import available_sources, load_wetlands_nearby, cache_summary
 from report_logic import check_compliance, calculate_min_distance, estimate_utm_crs_for
 from risk_score import assess_property_risk
 from certificate import build_certificate_pdf, generate_verification_id
@@ -51,6 +53,24 @@ _pdf_cache: Dict[str, bytes] = {}
 # Anonymous (key-less) usage counters, per client host. In-process only; the
 # durable, enforceable quota lives in the api_keys table for key holders.
 _anon_usage: Dict[str, int] = {}
+
+
+def _require_admin_token(x_admin_token: Optional[str]) -> None:
+    """Protect maintenance and entitlement operations from public callers."""
+    expected = os.getenv("ADMIN_API_TOKEN")
+    if not expected:
+        raise HTTPException(status_code=503, detail="Administrative operations are not configured.")
+    if not x_admin_token or not secrets.compare_digest(x_admin_token, expected):
+        raise HTTPException(status_code=403, detail="Administrator authorization required.")
+
+
+def _require_professional_reports_enabled() -> None:
+    """Keep report issuance off until data and reviewer controls are live."""
+    if os.getenv("ENABLE_PROFESSIONAL_REPORTS", "false").lower() != "true":
+        raise HTTPException(
+            status_code=503,
+            detail="Professional reports are unavailable while verified-data controls are being completed.",
+        )
 
 
 def _check_quota(x_api_key: Optional[str], client_host: str) -> Optional[Dict[str, Any]]:
@@ -136,6 +156,26 @@ def health_check():
     }
 
 
+@router.get("/api/v1/data-coverage", summary="Mapped Data Coverage & Provenance")
+def data_coverage():
+    """Expose the datasets currently available without exposing property searches."""
+    sources = available_sources()
+    summary = sources.get("cache_summary", {})
+    official_feature_count = sum(
+        count for tag, count in summary.items() if str(tag).startswith("official_")
+    )
+    return {
+        "status": "available",
+        "coverage_status": "verified" if official_feature_count else "community_or_unverified",
+        "official_feature_count": official_feature_count,
+        "sources": sources,
+        "notice": (
+            "Coverage is not a clearance map. Confirm parcel boundaries, feature type, and approval requirements "
+            "with a registered professional and the responsible authority."
+        ),
+    }
+
+
 @router.post("/api/v1/assess-plot", response_model=AssessPlotResponse, summary="Assess Property Risk Score")
 def assess_plot(req: AssessPlotRequest, request: Request, x_api_key: Optional[str] = Header(None, alias="X-API-Key")):
     """Parses plot location, queries spatial wetland cache, and returns property risk scorecard and legal citations."""
@@ -167,7 +207,11 @@ def assess_plot(req: AssessPlotRequest, request: Request, x_api_key: Optional[st
     )
 
     risk = assess_property_risk(in_wetland, min_dist, feature_kind=nearest_kind, lat=lat, lon=lon)
-    log_event("api_assess_plot", {"lat": lat, "lon": lon, "score": risk.score, "input_method": input_method})
+    # Do not persist a buyer's precise pin in the generic event log.
+    log_event(
+        "api_assess_plot",
+        {"score": risk.score, "country": risk.country, "input_method": input_method},
+    )
 
     # Optional flood susceptibility analysis (plan Phase 3.3) — opt-in so the
     # core wetland screening stays fast and hermetic.
@@ -201,17 +245,18 @@ def assess_plot(req: AssessPlotRequest, request: Request, x_api_key: Optional[st
 
 @router.post("/api/v1/reports/generate", response_model=GenerateReportResponse, summary="Generate Due Diligence Certificate")
 def generate_report(req: GenerateReportRequest, request: Request, x_api_key: Optional[str] = Header(None, alias="X-API-Key")):
-    """Generates bank-grade PDF due-diligence certificate, stores verification record, and returns download URL."""
+    """Generates an indicative screening report for an entitled professional user."""
+    _require_professional_reports_enabled()
     key_record = _check_quota(x_api_key, request.client.host if request.client else "unknown")
 
     # Freemium gate (plan Phase 3.2): 'free' tier keys get the score but not the
     # stamped PDF. Anonymous callers keep the free preview behavior.
-    if key_record is not None and key_record.get("tier") == "free":
+    if key_record is None or key_record.get("tier") == "free":
         raise HTTPException(
             status_code=402,
             detail=(
-                "PDF certificates require a paid plan. Purchase the Instant Due Diligence "
-                "Certificate via /api/v1/payments/initiate (plan_id='instant')."
+                "Indicative PDF reports are available only to a provisioned professional account. "
+                "Self-service paid access is not yet enabled."
             ),
         )
 
@@ -276,8 +321,9 @@ def generate_report_async(req: GenerateReportRequest, request: Request, x_api_ke
     Triggers an asynchronous worker task (Celery) to generate the PDF certificate.
     Returns a task ID that can be polled for status.
     """
+    _require_professional_reports_enabled()
     key_record = _check_quota(x_api_key, request.client.host if request.client else "unknown")
-    if key_record is not None and key_record.get("tier") == "free":
+    if key_record is None or key_record.get("tier") == "free":
         raise HTTPException(
             status_code=402,
             detail=(
@@ -354,6 +400,7 @@ def get_task_status(task_id: str):
 @router.get("/api/v1/reports/download/{certificate_id}", summary="Download Issued Certificate PDF")
 def download_certificate(certificate_id: str):
     """Retrieves and streams the generated PDF certificate by verification ID."""
+    _require_professional_reports_enabled()
     if certificate_id in _pdf_cache:
         pdf_bytes = _pdf_cache[certificate_id]
         return Response(
@@ -383,6 +430,9 @@ def verify_certificate(certificate_id: str):
             "message": "Certificate ID not found in official verification registry.",
         }
 
+    # Public verification deliberately excludes precise coordinates and plot
+    # labels. A certificate proves that a record exists; it is not a public
+    # property-location database.
     return {
         "status": "valid",
         "certificate_id": certificate_id,
@@ -391,8 +441,6 @@ def verify_certificate(certificate_id: str):
             "score": record.get("score"),
             "band": record.get("band"),
             "country": record.get("country"),
-            "latitude": record.get("lat"),
-            "longitude": record.get("lon"),
         },
     }
 
@@ -425,6 +473,11 @@ def register_api_key(req: ApiKeyRequest):
     """
     if not valid_tier(req.tier):
         raise HTTPException(status_code=400, detail=f"Unknown tier '{req.tier}'.")
+    if req.tier != "free":
+        raise HTTPException(
+            status_code=403,
+            detail="Paid tiers cannot be self-assigned. Contact the pilot team for provisioned access.",
+        )
 
     record = create_api_key(req.name, tier=req.tier)
     if record is None:
@@ -467,6 +520,12 @@ def initiate_payment(req: PaymentInitiateRequest):
     Starts a payment for a plan via Pesapal (MTN MoMo, Airtel Money, M-Pesa)
     or Flutterwave (cards, M-Pesa, diaspora). Returns a redirect URL.
     """
+    if os.getenv("ENABLE_SELF_SERVICE_PAYMENTS", "false").lower() != "true":
+        raise HTTPException(
+            status_code=503,
+            detail="Self-service payments are unavailable during the pilot. Do not submit payment details.",
+        )
+
     plan = get_plan(req.plan_id)
     if plan is None or req.plan_id == "free":
         raise HTTPException(status_code=400, detail=f"Plan '{req.plan_id}' is not purchasable.")
@@ -527,6 +586,7 @@ def activate_paid_tier(
     plan_id: str,
     provider: str,
     transaction_id: str,
+    x_admin_token: Optional[str] = Header(None, alias="X-Admin-Token"),
 ):
     """
     Verifies a payment server-side and upgrades the API key to the purchased
@@ -534,6 +594,7 @@ def activate_paid_tier(
     Phase 3.2 (paywall): the client hits this after the gateway redirect
     confirms success.
     """
+    _require_admin_token(x_admin_token)
     plan = get_plan(plan_id)
     if plan is None or plan_id == "free":
         raise HTTPException(status_code=400, detail=f"Plan '{plan_id}' is not purchasable.")
@@ -580,8 +641,9 @@ def get_flood_risk(req: FloodRiskRequest):
 # --- Operations -----------------------------------------------------------------------
 
 @router.post("/api/v1/admin/cleanup-certificates", summary="Purge Expired Certificate Records")
-def admin_cleanup_certificates(days: int = 90):
+def admin_cleanup_certificates(days: int = 90, x_admin_token: Optional[str] = Header(None, alias="X-Admin-Token")):
     """Manually triggers the certificate retention cleanup run by the Celery beat task."""
+    _require_admin_token(x_admin_token)
     removed = storage_cleanup_expired(days=days)
     if removed < 0:
         raise HTTPException(status_code=500, detail="Cleanup failed (storage unavailable?).")

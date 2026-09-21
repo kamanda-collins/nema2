@@ -4,22 +4,32 @@ Phase 2 FastAPI application entry point.
 Run with: uvicorn main:app --reload --port 8000
 """
 
+import os
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from api.routes import router
 
 app = FastAPI(
     title="NEMA East Africa Wetlands Due Diligence API",
-    description="Commercial PropTech REST API providing automated wetland risk scoring, statutory buffer checks, and bank-grade due diligence certificates for Uganda and Kenya.",
+    description="Preliminary mapped wetland and water-feature screening for deposit-stage property due diligence in Uganda and Kenya. Not a clearance, survey, title search, or authority decision.",
     version="2.0.0",
     docs_url="/docs",
     redoc_url="/redoc",
 )
 
+allowed_origins = [
+    origin.strip()
+    for origin in os.getenv("ALLOWED_ORIGINS", "http://localhost:3000").split(",")
+    if origin.strip()
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
+    # Credentials and a wildcard origin are unsafe together. Production must
+    # explicitly list its web application origins in ALLOWED_ORIGINS.
+    allow_origins=allowed_origins,
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )

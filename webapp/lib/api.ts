@@ -12,6 +12,7 @@ import type {
   BatchAssessResponse,
   BatchPlotItem,
   CadastralSearchResponse,
+  DataCoverageResponse,
   FloodRisk,
   GenerateReportRequest,
   GenerateReportResponse,
@@ -119,6 +120,10 @@ async function request<T>(path: string, init?: RequestInit & { timeoutMs?: numbe
 
 export function getHealth() {
   return request<Record<string, unknown>>("/health");
+}
+
+export function getDataCoverage() {
+  return request<DataCoverageResponse>("/api/v1/data-coverage");
 }
 
 /* --------------------------------------------------------- plot assessment */

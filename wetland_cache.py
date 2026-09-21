@@ -302,8 +302,12 @@ def load_wetlands_nearby(
         if cached is not None and not cached.empty:
             nearby = filter_within_radius(cached, lat, lon, radius_m)
             if not nearby.empty:
+                source_tags = sorted(str(s) for s in nearby.get("source", pd.Series(dtype=str)).dropna().unique())
+                verified = any(tag.startswith("official_") for tag in source_tags)
                 return nearby, {
                     "source": "local_cache",
+                    "source_tags": source_tags,
+                    "coverage_status": "verified" if verified else "community_or_unverified",
                     "used_cache": True,
                     "used_osm": False,
                     "count": len(nearby),
@@ -363,6 +367,8 @@ def load_wetlands_nearby(
     
     return fetched, {
         "source": "osm_live",
+        "source_tags": ["osm"],
+        "coverage_status": "community_or_unverified",
         "used_cache": False,
         "used_osm": True,
         "cached": True,

@@ -1,5 +1,7 @@
 "use client";
 
+import { useState } from "react";
+
 export type InputMode = "search" | "link" | "coords";
 
 export interface PlotFormValue {
@@ -49,18 +51,20 @@ export default function PlotInput({
   includeFlood: boolean;
   onIncludeFloodChange: (next: boolean) => void;
 }) {
+  const [acknowledged, setAcknowledged] = useState(false);
   const active = MODES.find((m) => m.id === value.mode) ?? MODES[0];
 
   function set<K extends keyof PlotFormValue>(key: K, v: PlotFormValue[K]) {
     onChange({ ...value, [key]: v });
   }
 
-  const canSubmit =
+  const hasLocation =
     value.mode === "search"
       ? value.query.trim().length >= 3
       : value.mode === "link"
         ? value.mapLink.trim().length >= 3
         : value.lat.trim() !== "" && value.lon.trim() !== "";
+  const canSubmit = hasLocation && acknowledged;
 
   return (
     <form
@@ -211,10 +215,22 @@ export default function PlotInput({
         </span>
       </label>
 
+      <label className="flex cursor-pointer items-start gap-2 rounded-lg border border-brand/15 bg-blue-50/60 p-3 text-xs text-slate-700">
+        <input
+          type="checkbox"
+          className="mt-0.5"
+          checked={acknowledged}
+          onChange={(e) => setAcknowledged(e.target.checked)}
+        />
+        <span>
+          <span className="font-semibold">I understand this is a preliminary mapped-data screen.</span>
+          <span className="block text-slate-600">I will not treat a pin result as a land survey, title check, clearance, or authority decision.</span>
+        </span>
+      </label>
+
       <button type="submit" className="btn-primary w-full" disabled={!canSubmit || busy}>
         {busy ? "Screening plot…" : "Run compliance screening"}
       </button>
     </form>
   );
 }
-

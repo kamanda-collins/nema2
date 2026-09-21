@@ -3,6 +3,7 @@
 import { useState } from "react";
 import CadastralSearch from "@/components/CadastralSearch";
 import CertificateActions from "@/components/CertificateActions";
+import DecisionChecklist from "@/components/DecisionChecklist";
 import FloodPanel from "@/components/FloodPanel";
 import MapPanel from "@/components/MapPanel";
 import PlotInput, { EMPTY_PLOT, type PlotFormValue } from "@/components/PlotInput";
@@ -80,12 +81,12 @@ export default function HomePage() {
       {/* Hero */}
       <section className="rounded-2xl bg-gradient-to-br from-brand to-brand-accent px-6 py-8 text-white">
         <h1 className="text-2xl font-bold sm:text-3xl">
-          Is this plot on a wetland? Know before you pay.
+          Check this location before you pay a deposit.
         </h1>
         <p className="mt-2 max-w-2xl text-sm text-blue-50">
-          Instant screening against gazetted wetland layers and OpenStreetMap for Uganda and Kenya.
-          Get a traffic-light risk score, the statutory buffer distance and a shareable PDF
-          due-diligence certificate your bank, lawyer or buyer will accept.
+          Find mapped wetland and water-feature signals around a pin. Use the result to decide
+          whether to pause, inspect, or obtain a surveyor and authority verification—never as
+          proof that land is cleared.
         </p>
       </section>
 
@@ -142,27 +143,21 @@ export default function HomePage() {
 
           {!result && !busy && (
             <div className="card">
-              <p className="label">How the score works</p>
+              <p className="label">How to use this screen</p>
               <ul className="space-y-2 text-sm text-slate-600">
                 <li>
-                  <span className="font-semibold text-risk-high">High Risk (0-45)</span> — the plot
-                  overlaps a mapped wetland, or sits inside the statutory buffer / riparian
-                  corridor. Development is restricted.
+                  <span className="font-semibold text-risk-high">Mapped overlap / close signal</span> — pause the transaction and obtain professional advice.
                 </li>
                 <li>
-                  <span className="font-semibold text-risk-caution">Caution (60-89)</span> — outside
-                  the buffer but within 500 m of a water feature, so expect a NEMA or NEMA/EMCA
-                  review, or the distance could not be computed.
+                  <span className="font-semibold text-risk-caution">Needs verification</span> — a nearby feature, uncertain pin, or incomplete coverage needs field checks.
                 </li>
                 <li>
-                  <span className="font-semibold text-risk-safe">Safe (90-100)</span> — 500 m or
-                  more from the nearest mapped wetland or waterway.
+                  <span className="font-semibold text-slate-700">No mapped signal</span> — this is not a clearance; unmapped or seasonal features may still exist.
                 </li>
               </ul>
               <p className="mt-3 text-xs text-slate-500">
-                Scores combine proximity to gazetted wetland polygons and OSM water features with
-                the statutory setback for the jurisdiction (NEA 2019 for Uganda, EMCA 1999 for
-                Kenya). The colour always follows the more restrictive of the two.
+                Results describe mapped signals and data coverage. Buffer requirements vary by
+                feature and jurisdiction and must be confirmed by the responsible authority.
               </p>
             </div>
           )}
@@ -170,6 +165,7 @@ export default function HomePage() {
           {result && (
             <div className="space-y-4">
               <RiskScorecard result={result} />
+              <DecisionChecklist result={result} />
               <FloodPanel flood={flood} loading={includeFlood && !flood} />
               <CertificateActions result={result} />
             </div>

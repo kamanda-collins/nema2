@@ -1,5 +1,10 @@
 # Plot Screener
 
+> Current product position: a preliminary mapped-signal check to use before
+> paying a land deposit. It is not clearance, a cadastral survey, title search,
+> legal advice, or a NEMA decision. Check `updates.md` before enabling reports
+> or payments in any deployed environment.
+
 A property due-diligence platform for wetland & water risk checks on land in Uganda and Kenya — **built for real estate**: plot buyers, sellers, agents, developers and investors. Pick any plot and the app automatically fetches mapped wetlands, lakes, rivers and streams around it from OpenStreetMap (no GIS files needed), then tells you what the proximity means for your purchase or development decision — including NEMA compliance implications.
 
 It remains useful for environmental consultants and regulators doing rapid NEMA screening of development sites near sensitive wetland ecosystems.

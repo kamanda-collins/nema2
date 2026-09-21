@@ -5,7 +5,7 @@
  * Keep in sync with the backend when contracts change.
  */
 
-export type RiskBand = "Safe" | "Caution" | "High Risk";
+export type RiskBand = "Mapped overlap" | "Needs verification" | "No mapped signal" | "High Risk" | "Caution" | "Safe";
 export type TrafficLight = "green" | "yellow" | "red";
 
 export interface RiskScorecard {
@@ -52,7 +52,17 @@ export interface Provenance {
   used_osm?: boolean;
   cached?: boolean;
   count?: number;
+  source_tags?: string[];
+  coverage_status?: "verified" | "community_or_unverified" | string;
   message: string;
+}
+
+export interface DataCoverageResponse {
+  status: string;
+  coverage_status: "verified" | "community_or_unverified" | string;
+  official_feature_count: number;
+  sources: { cache_exists: boolean; cache_summary: Record<string, number>; official_layers: string[] };
+  notice: string;
 }
 
 export interface FloodRisk {

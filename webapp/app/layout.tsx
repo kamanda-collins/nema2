@@ -5,9 +5,9 @@ import "maplibre-gl/dist/maplibre-gl.css";
 import ApiKeyBar from "@/components/ApiKeyBar";
 
 export const metadata: Metadata = {
-  title: "NEMA Wetland Due Diligence | Plot Risk Screening",
+  title: "Wetland Risk Screen | Before You Pay a Deposit",
   description:
-    "Instant wetland compliance screening for land buyers, lenders and conveyancers in Uganda & Kenya. Traffic-light risk score, 2-page PDF certificate, QR verification.",
+    "A preliminary environmental-risk screen for land buyers in Uganda and Kenya. Check a location before paying a deposit, then verify with licensed professionals and authorities.",
   keywords: [
     "wetland compliance",
     "NEMA",
@@ -18,8 +18,8 @@ export const metadata: Metadata = {
     "property risk",
   ],
   openGraph: {
-    title: "NEMA Wetland Due Diligence",
-    description: "Check any plot for wetland encroachment risk before you buy.",
+    title: "Wetland Risk Screen",
+    description: "Check mapped environmental signals before paying a land deposit.",
     type: "website",
   },
 };
@@ -36,6 +36,7 @@ const NAV = [
   { href: "/batch", label: "Batch" },
   { href: "/verify", label: "Verify" },
   { href: "/pricing", label: "Pricing" },
+  { href: "/privacy", label: "Privacy" },
 ];
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
@@ -50,10 +51,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               </span>
               <span className="leading-tight">
                 <span className="block text-sm font-bold text-slate-900">
-                  Wetland Due Diligence
+                  Wetland Risk Screen
                 </span>
                 <span className="block text-[11px] text-slate-500">
-                  Uganda &amp; Kenya · NEA 2019 / EMCA 1999
+                  Preliminary check · Uganda &amp; Kenya
                 </span>
               </span>
             </Link>
@@ -78,12 +79,12 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <footer className="mt-10 border-t border-slate-200 bg-white py-6">
           <div className="mx-auto max-w-6xl space-y-1 px-4 text-xs text-slate-500">
             <p className="font-semibold text-slate-600">
-              Indicative screening only. Not a substitute for a certified survey or a NEMA
-              environmental audit.
+              Preliminary location screen only. It is not clearance, a land survey, title search,
+              or a NEMA decision.
             </p>
             <p>
-              Data: OpenStreetMap · Copernicus GLO-90 DEM · gazetted wetland registries.
-              Screening results are guidance, not legal advice.
+              Data sources and coverage are shown with each result. A map pin is not a parcel
+              boundary; confirm with a registered surveyor and the relevant authority.
             </p>
           </div>
         </footer>

@@ -26,22 +26,8 @@ export default function PricingPage() {
   }, []);
 
   async function pay() {
-    setBusy(true);
-    setError(null);
     setCheckout(null);
-    try {
-      const resp = await initiatePayment({
-        plan_id: selected,
-        provider,
-        phone: phone.trim() || undefined,
-        email: email.trim() || undefined,
-      });
-      setCheckout(resp);
-    } catch (err) {
-      setError(err instanceof ApiError ? err.detail : "Could not start the payment.");
-    } finally {
-      setBusy(false);
-    }
+    setError("Self-service payment is not live during the pilot. Professional access is provisioned after a verified review.");
   }
 
   const order: string[] = ["free", "instant", "pro", "law_firm"];
@@ -50,10 +36,10 @@ export default function PricingPage() {
   return (
     <div className="space-y-6">
       <section>
-        <h1 className="text-2xl font-bold text-slate-900">Plans &amp; pricing</h1>
+        <h1 className="text-2xl font-bold text-slate-900">Pilot access</h1>
         <p className="mt-1 max-w-2xl text-sm text-slate-600">
-          Screen any plot free. Pay per certificate with Mobile Money, or take a monthly pack for
-          your agency, law firm or lending desk.
+          Location screening is free. Paid reports and organisational access are paused until the
+          verified-data and professional-review workflow is complete.
         </p>
       </section>
 
@@ -123,10 +109,10 @@ export default function PricingPage() {
       {/* Checkout */}
       <div className="card space-y-4">
         <div>
-          <p className="label">Checkout</p>
+          <p className="label">Professional access</p>
           <p className="text-sm text-slate-600">
-            Mobile Money (MTN MoMo, Airtel Money, M-Pesa) via Pesapal, or cards and diaspora
-            payments via Flutterwave.
+            Do not submit payment details here. Pilot access is provisioned only after a manual
+            review of data coverage and intended use.
           </p>
         </div>
 
@@ -174,7 +160,7 @@ export default function PricingPage() {
 
           <div>
             <label className="label" htmlFor="phone">
-              {provider === "pesapal" ? "MoMo / M-Pesa number" : "Phone (optional)"}
+              Contact number (not collected during pilot)
             </label>
             <input
               id="phone"
@@ -188,7 +174,7 @@ export default function PricingPage() {
 
         <div>
           <label className="label" htmlFor="email">
-            Email for the receipt
+            Contact email (not collected during pilot)
           </label>
           <input
             id="email"
@@ -201,7 +187,7 @@ export default function PricingPage() {
         </div>
 
         <button className="btn-primary" onClick={pay} disabled={busy}>
-          {busy ? "Starting checkout…" : "Proceed to payment"}
+          Request pilot access
         </button>
 
         {error && <p className="rounded-lg bg-risk-high/5 p-3 text-xs text-risk-high">{error}</p>}

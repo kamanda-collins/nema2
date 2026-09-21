@@ -39,15 +39,27 @@ def test_billing_plans_endpoint():
     assert plans["instant"]["certificates"] is True
 
 
-def test_register_api_key_endpoint():
+def test_data_coverage_endpoint_reports_provenance():
+    resp = client.get("/api/v1/data-coverage")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["coverage_status"] in {"verified", "community_or_unverified"}
+    assert "notice" in data
+    assert "sources" in data
+
+
+def test_register_api_key_only_allows_free_tier():
     resp = client.post(
         "/api/v1/billing/api-keys",
         json={"name": "Test Agency", "tier": "pro"},
     )
-    assert resp.status_code == 200
-    record = resp.json()["api_key"]
+    assert resp.status_code == 403
+
+    free = client.post("/api/v1/billing/api-keys", json={"name": "Test Agency", "tier": "free"})
+    assert free.status_code == 200
+    record = free.json()["api_key"]
     assert record["key"].startswith("nema_")
-    assert record["tier"] == "pro"
+    assert record["tier"] == "free"
 
 
 def test_register_api_key_rejects_unknown_tier():
@@ -121,18 +133,18 @@ def test_usage_endpoint_rejects_unknown_key():
     assert resp.status_code == 401
 
 
-def test_free_tier_key_cannot_generate_certificates_402(isolated_db):
+def test_reports_are_disabled_by_default(isolated_db):
     record = storage.create_api_key("Freebie", tier="free", db_path=isolated_db)
     resp = client.post(
         "/api/v1/reports/generate",
         json={"lat": 0.3476, "lon": 32.5825},
         headers={"X-API-Key": record["key"]},
     )
-    assert resp.status_code == 402
-    assert "paid plan" in resp.json()["detail"]
+    assert resp.status_code == 503
 
 
-def test_pro_tier_key_can_generate_certificates(isolated_db):
+def test_pro_tier_can_generate_reports_when_explicitly_enabled(isolated_db, monkeypatch):
+    monkeypatch.setenv("ENABLE_PROFESSIONAL_REPORTS", "true")
     record = storage.create_api_key("Pro User", tier="pro", db_path=isolated_db)
     resp = client.post(
         "/api/v1/reports/generate",
@@ -152,20 +164,17 @@ def test_payment_initiation_degrades_without_credentials():
         "/api/v1/payments/initiate",
         json={"plan_id": "instant", "provider": "pesapal", "email": "u@x.com"},
     )
-    assert resp.status_code == 200
-    data = resp.json()
-    assert data["status"] == "not_configured"
-    assert data["provider"] == "pesapal"
+    assert resp.status_code == 503
 
 
-def test_payment_initiation_rejects_free_plan():
+def test_payment_initiation_is_disabled_before_validating_plan():
     resp = client.post("/api/v1/payments/initiate", json={"plan_id": "free"})
-    assert resp.status_code == 400
+    assert resp.status_code == 503
 
 
-def test_payment_initiation_rejects_unknown_plan():
+def test_payment_initiation_does_not_accept_unknown_plan_while_disabled():
     resp = client.post("/api/v1/payments/initiate", json={"plan_id": "gold"})
-    assert resp.status_code == 400
+    assert resp.status_code == 503
 
 
 def test_payment_status_endpoint_without_credentials():
@@ -175,6 +184,7 @@ def test_payment_status_endpoint_without_credentials():
 
 
 def test_activate_refuses_unconfirmed_payment(isolated_db, monkeypatch):
+    monkeypatch.setenv("ADMIN_API_TOKEN", "test-admin-token")
     record = storage.create_api_key("Late Buyer", tier="free", db_path=isolated_db)
     monkeypatch.setattr(
         payment_gateway,
@@ -189,6 +199,7 @@ def test_activate_refuses_unconfirmed_payment(isolated_db, monkeypatch):
             "provider": "pesapal",
             "transaction_id": "TRACK-2",
         },
+        headers={"X-Admin-Token": "test-admin-token"},
     )
     assert resp.status_code == 200
     assert resp.json()["status"] == "pending"
@@ -196,6 +207,7 @@ def test_activate_refuses_unconfirmed_payment(isolated_db, monkeypatch):
 
 
 def test_activate_upgrades_after_confirmed_payment(isolated_db, monkeypatch):
+    monkeypatch.setenv("ADMIN_API_TOKEN", "test-admin-token")
     record = storage.create_api_key("Happy Buyer", tier="free", db_path=isolated_db)
     monkeypatch.setattr(
         payment_gateway,
@@ -210,6 +222,7 @@ def test_activate_upgrades_after_confirmed_payment(isolated_db, monkeypatch):
             "provider": "flutterwave",
             "transaction_id": "TX-9",
         },
+        headers={"X-Admin-Token": "test-admin-token"},
     )
     assert resp.status_code == 200
     assert resp.json()["status"] == "activated"
@@ -217,6 +230,7 @@ def test_activate_upgrades_after_confirmed_payment(isolated_db, monkeypatch):
 
 
 def test_activate_rejects_unknown_key(isolated_db, monkeypatch):
+    monkeypatch.setenv("ADMIN_API_TOKEN", "test-admin-token")
     monkeypatch.setattr(
         payment_gateway,
         "check_payment_status",
@@ -230,6 +244,7 @@ def test_activate_rejects_unknown_key(isolated_db, monkeypatch):
             "provider": "pesapal",
             "transaction_id": "T",
         },
+        headers={"X-Admin-Token": "test-admin-token"},
     )
     assert resp.status_code == 401
 
@@ -272,9 +287,14 @@ def test_flood_risk_endpoint_validates_input():
 
 # --- Ops --------------------------------------------------------------------------------------
 
-def test_admin_cleanup_endpoint(isolated_db):
+def test_admin_cleanup_endpoint_requires_admin_token(isolated_db, monkeypatch):
+    monkeypatch.setenv("ADMIN_API_TOKEN", "test-admin-token")
     storage.save_certificate("NEMA-KEEP", {"score": 80, "band": "SAFE"}, db_path=isolated_db)
-    resp = client.post("/api/v1/admin/cleanup-certificates", params={"days": 90})
+    resp = client.post(
+        "/api/v1/admin/cleanup-certificates",
+        params={"days": 90},
+        headers={"X-Admin-Token": "test-admin-token"},
+    )
     assert resp.status_code == 200
     assert resp.json()["removed"] >= 0
 
