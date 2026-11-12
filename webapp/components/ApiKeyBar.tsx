@@ -12,7 +12,8 @@ import {
 import type { UsageResponse } from "@/lib/types";
 
 /**
- * Header strip showing backend connectivity plus API-key / quota state.
+ * Backend connectivity plus API-key / quota state, rendered as a quiet block.
+ * Sits at the bottom of the desktop sidebar and inside the phone menu sheet.
  * Free/anonymous users can screen plots but cannot issue certificates.
  */
 export default function ApiKeyBar() {
@@ -84,45 +85,48 @@ export default function ApiKeyBar() {
   }
 
   return (
-    <div className="border-t border-slate-100 bg-slate-50">
-      <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-x-3 gap-y-1 px-4 py-1.5 text-[11px]">
-        <span className="flex items-center gap-1.5">
-          <span
-            className={`h-2 w-2 rounded-full ${
-              online === null ? "bg-slate-400" : online ? "bg-risk-safe" : "bg-risk-high"
-            }`}
-          />
-          <span className="text-slate-500">
-            {online === null
-              ? "Checking screening API…"
-              : online
-                ? "Screening API online"
-                : "Screening API unreachable"}
-          </span>
+    <div className="rounded-md border border-line bg-white p-3 text-xs">
+      <div className="flex items-center gap-2">
+        <span
+          aria-hidden
+          className={`h-1.5 w-1.5 shrink-0 rounded-full ${
+            online === null ? "bg-control" : online ? "bg-risk-safe" : "bg-risk-high"
+          }`}
+        />
+        <span className="min-w-0 flex-1 truncate text-muted">
+          {online === null
+            ? "Checking screening API…"
+            : online
+              ? "Screening API online"
+              : "Screening API unreachable"}
         </span>
+      </div>
 
-        <span className="text-slate-300">|</span>
-
+      <div className="mt-2 flex flex-wrap items-baseline gap-x-2 gap-y-1">
         {key ? (
           <>
-            <span className="font-medium text-slate-600">
+            <span className="font-medium text-ink">
               {usage ? `${usage.tier} tier` : "keyed"}
             </span>
             {usage && (
-              <span className="text-slate-500">
-                {usage.unlimited
-                  ? `${usage.requests_used} reports used · unlimited`
-                  : `${usage.requests_used}/${usage.limit} used · ${usage.remaining} left this month`}
+              <span className="tnum text-muted">
+                {usage.credit_based
+                  ? `${usage.requests_used} screens used · ${usage.certificate_credits} credit${
+                      usage.certificate_credits === 1 ? "" : "s"
+                    } left`
+                  : usage.unlimited
+                    ? `${usage.requests_used} reports used · unlimited`
+                    : `${usage.requests_used}/${usage.limit} used · ${usage.remaining} left`}
               </span>
             )}
-            <button onClick={clear} className="text-brand underline">
+            <button onClick={clear} className="underline hover:text-ink">
               sign out
             </button>
           </>
         ) : (
           <>
-            <span className="text-slate-500">Anonymous free preview</span>
-            <button onClick={() => setOpen((v) => !v)} className="font-medium text-brand underline">
+            <span className="text-muted">Anonymous free preview</span>
+            <button onClick={() => setOpen((v) => !v)} className="font-medium underline hover:text-ink">
               {open ? "cancel" : "add API key"}
             </button>
           </>
@@ -130,39 +134,35 @@ export default function ApiKeyBar() {
       </div>
 
       {open && (
-        <div className="mx-auto max-w-6xl space-y-2 px-4 pb-3 text-xs">
-          <div className="flex flex-wrap items-end gap-2">
-            <div className="min-w-[220px] flex-1">
-              <label className="label" htmlFor="api-key">
-                Existing API key
-              </label>
-              <input
-                id="api-key"
-                className="field"
-                placeholder="paste your X-API-Key"
-                value={draft}
-                onChange={(e) => setDraft(e.target.value)}
-              />
-            </div>
-            <button className="btn-primary" onClick={save} disabled={busy}>
+        <div className="mt-3 space-y-3 border-t border-rule pt-3">
+          <div>
+            <label className="label" htmlFor="api-key">
+              Existing API key
+            </label>
+            <input
+              id="api-key"
+              className="field"
+              placeholder="paste your X-API-Key"
+              value={draft}
+              onChange={(e) => setDraft(e.target.value)}
+            />
+            <button className="btn-primary mt-2 w-full" onClick={save} disabled={busy}>
               Use key
             </button>
           </div>
 
-          <div className="flex flex-wrap items-end gap-2 border-t border-slate-200 pt-2">
-            <div className="min-w-[220px] flex-1">
-              <label className="label" htmlFor="key-name">
-                …or mint a free key
-              </label>
-              <input
-                id="key-name"
-                className="field"
-                placeholder="agency or app name"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-              />
-            </div>
-            <button className="btn-ghost" onClick={() => mint("free")} disabled={busy}>
+          <div>
+            <label className="label" htmlFor="key-name">
+              …or mint a free key
+            </label>
+            <input
+              id="key-name"
+              className="field"
+              placeholder="agency or app name"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+            />
+            <button className="btn-secondary mt-2 w-full" onClick={() => mint("free")} disabled={busy}>
               {busy ? "Creating…" : "Create free key"}
             </button>
           </div>

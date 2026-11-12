@@ -4,6 +4,8 @@ import pytest
 from fastapi.testclient import TestClient
 from main import app
 
+import storage
+
 client = TestClient(app)
 
 def test_health_check():
@@ -34,14 +36,24 @@ def test_assess_plot_invalid_location():
     assert response.status_code == 400
     assert "Could not determine property coordinates" in response.json()["detail"]
 
-def test_generate_and_verify_report():
+def test_generate_and_verify_report(monkeypatch, tmp_path):
+    # Report issuance is gated twice (updates.md): the ENABLE_PROFESSIONAL_REPORTS
+    # kill-switch, then the paywall. Both gates are covered by test_api_phase3;
+    # here we exercise the generate -> download -> verify round trip end to end
+    # using a provisioned professional (non-free) key in a throwaway database.
+    monkeypatch.setenv("ENABLE_PROFESSIONAL_REPORTS", "true")
+    db_path = str(tmp_path / "app_data.db")
+    monkeypatch.setattr(storage, "DEFAULT_DB_PATH", db_path)
+    key = storage.create_api_key("Test Pro", tier="pro", db_path=db_path)["key"]
+    headers = {"X-API-Key": key}
+
     # 1. Generate - Use coordinates with cache coverage (Kampala area, safe location)
     gen_payload = {
         "lat": 0.3476,
         "lon": 32.5825,
         "plot_label": "Kampala Safe Plot"
     }
-    gen_response = client.post("/api/v1/reports/generate", json=gen_payload)
+    gen_response = client.post("/api/v1/reports/generate", json=gen_payload, headers=headers)
     assert gen_response.status_code == 200
     gen_data = gen_response.json()
     cert_id = gen_data["certificate_id"]

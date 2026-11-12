@@ -1,5 +1,10 @@
 # Production Blueprint & Implementation Plan: NEMA Wetlands Compliance & Property Due Diligence
 
+> **Superseded in parts:** see `MARKET_STRATEGY.md` (Nov 2026) — it rewires the
+> segment order (diaspora first), repositions the report around title-fraud signals,
+> adds the Diaspora Express SKU and defers the B2B portal work. Where the two
+> documents disagree, the strategy document wins.
+
 ## Executive Summary
 
 The **NEMA Wetlands Compliance Checker** is transitioning from a technical, GIS-oriented Streamlit prototype into a commercial **PropTech Property Due Diligence Platform** tailored for Uganda and Kenya. 

@@ -80,15 +80,15 @@ export default function CertificateActions({ result }: { result: AssessPlotRespo
   }
 
   const shareText = encodeURIComponent(
-    `Preliminary wetland-risk screen for ${location.label}. ${risk.headline} ` +
+    `Preliminary plot screen for ${location.label}. ${risk.headline} ` +
       `This is not a clearance or survey.`,
   );
 
   return (
-    <div className="card space-y-4">
+    <section className="card space-y-4 p-5">
       <div>
-        <p className="label">Professional review</p>
-        <p className="text-sm text-slate-600">
+        <p className="text-xs text-muted">Professional report</p>
+        <p className="mt-1 text-sm leading-relaxed text-muted">
           Downloadable reports are paused while verified-source coverage, reviewer workflow and
           privacy controls are completed. Save this screening and use it to brief a registered
           surveyor, environmental practitioner or the relevant authority.
@@ -96,12 +96,17 @@ export default function CertificateActions({ result }: { result: AssessPlotRespo
       </div>
 
       <div className="flex flex-wrap gap-2">
-        <button className="btn-primary" onClick={issue} disabled={busy || !reportIssuanceAvailable} title="Reports are not available during the pilot">
-          Professional report coming soon
+        <button
+          className="btn-primary"
+          onClick={issue}
+          disabled={busy || !reportIssuanceAvailable}
+          title="Reports are not available during the pilot"
+        >
+          Report coming soon
         </button>
 
         {!certId && (
-          <button className="btn-ghost" onClick={() => setShowBranding((v) => !v)}>
+          <button className="btn-secondary" onClick={() => setShowBranding((v) => !v)}>
             {showBranding ? "Hide branding" : "Add agency branding"}
           </button>
         )}
@@ -110,24 +115,24 @@ export default function CertificateActions({ result }: { result: AssessPlotRespo
       {showBranding && !certId && <BrandingForm value={branding} onChange={setBranding} />}
 
       {paywall && (
-        <div className="rounded-lg border border-risk-caution/40 bg-risk-caution/5 p-3 text-xs">
-          <p className="font-semibold text-risk-caution">Upgrade required</p>
-          <p className="mt-1 text-slate-600">
+        <div className="card p-3 text-xs">
+          <p className="font-medium text-ink">Upgrade required</p>
+          <p className="mt-1 text-muted">
             Professional reports are not yet available for self-service purchase.
           </p>
-          <a href="/pricing" className="mt-2 inline-block font-semibold text-brand underline">
+          <a href="/pricing" className="mt-2 inline-block underline hover:text-ink">
             View pilot access information
           </a>
         </div>
       )}
 
-      {error && <p className="rounded-lg bg-risk-high/5 p-3 text-xs text-risk-high">{error}</p>}
+      {error && <p className="text-xs text-risk-high">{error}</p>}
 
       {certId && (
-        <div className="space-y-3 rounded-lg border border-risk-safe/30 bg-risk-safe/5 p-3">
+        <div className="space-y-3 rounded-md border border-line bg-raised p-3">
           <div>
-            <p className="text-xs font-semibold text-slate-700">Certificate issued</p>
-            <p className="mt-1 break-all font-mono text-[11px] text-slate-600">{certId}</p>
+            <p className="text-xs font-medium text-ink">Report issued</p>
+            <p className="mt-1 break-all font-mono text-[11px] text-muted">{certId}</p>
           </div>
 
           <div className="flex flex-wrap gap-2">
@@ -140,33 +145,33 @@ export default function CertificateActions({ result }: { result: AssessPlotRespo
               Download PDF
             </a>
             <a
-              className="btn-ghost"
-              href={`https://wa.me/?text=${shareText}%20Certificate%20ID:%20${certId}`}
+              className="btn-secondary"
+              href={`https://wa.me/?text=${shareText}%20Report%20ID:%20${certId}`}
               target="_blank"
               rel="noopener noreferrer"
             >
               Share on WhatsApp
             </a>
-            <button className="btn-ghost" onClick={verify}>
+            <button className="btn-secondary" onClick={verify}>
               Verify registry entry
             </button>
           </div>
 
           {verifyResult && (
-            <div className="rounded-lg bg-white p-3 text-xs">
+            <div className="rounded-md bg-white p-3 text-xs">
               <p
-                className={`font-semibold ${
+                className={`font-medium ${
                   verifyResult.status === "valid" ? "text-risk-safe" : "text-risk-high"
                 }`}
               >
                 {verifyResult.status === "valid"
-                  ? "Valid - found in the official registry"
+                  ? "Valid, found in the official registry"
                   : verifyResult.message || "Not found in the registry"}
               </p>
               {verifyResult.assessment && (
-                <p className="mt-1 text-slate-600">
-                  Score {verifyResult.assessment.score}/100 - {verifyResult.assessment.band} -{" "}
-                  {verifyResult.assessment.country} - issued {verifyResult.issued_at}
+                <p className="tnum mt-1 text-muted">
+                  Score {verifyResult.assessment.score}/100 · {verifyResult.assessment.band} ·{" "}
+                  {verifyResult.assessment.country}, issued {verifyResult.issued_at}
                 </p>
               )}
             </div>
@@ -174,24 +179,24 @@ export default function CertificateActions({ result }: { result: AssessPlotRespo
         </div>
       )}
 
-      <div className="border-t border-slate-100 pt-3">
-        <p className="label">Was this screening useful?</p>
+      <div className="border-t border-rule pt-3">
+        <p className="mb-2 text-xs text-muted">Was this screening useful?</p>
         {feedbackSent ? (
-          <p className="text-xs text-risk-safe">Thank you - feedback recorded.</p>
+          <p className="text-xs text-risk-safe">Thank you, feedback recorded.</p>
         ) : (
           <div className="flex gap-2">
             <input
               className="field"
-              placeholder="One line of feedback..."
+              placeholder="One line of feedback…"
               value={feedback}
               onChange={(e) => setFeedback(e.target.value)}
             />
-            <button className="btn-ghost" onClick={sendFeedback}>
+            <button className="btn-secondary" onClick={sendFeedback}>
               Send
             </button>
           </div>
         )}
       </div>
-    </div>
+    </section>
   );
 }

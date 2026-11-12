@@ -33,19 +33,21 @@ function VerifyInner() {
     if (initial) run(initial);
   }, [initial, run]);
 
+  const valid = result?.status === "valid";
+
   return (
-    <div className="mx-auto max-w-2xl space-y-6">
-      <section>
-        <h1 className="text-2xl font-bold text-slate-900">Verify a certificate</h1>
-        <p className="mt-1 text-sm text-slate-600">
-          Every certificate carries a QR code pointing here. Enter the certificate ID from the
-          footer of the PDF to confirm it was issued by the official registry and that the
-          assessment has not been altered.
+    <div className="mx-auto max-w-2xl space-y-5">
+      <header>
+        <h1 className="text-2xl font-medium leading-tight text-ink">Verify a report</h1>
+        <p className="mt-1 text-sm text-muted">
+          Every report carries a QR code pointing here. Enter the report ID from the footer of the
+          PDF to confirm it was issued by the official registry and that the assessment has not
+          been altered.
         </p>
-      </section>
+      </header>
 
       <form
-        className="card space-y-3"
+        className="card space-y-3 p-5"
         onSubmit={(e) => {
           e.preventDefault();
           run(certId);
@@ -53,7 +55,7 @@ function VerifyInner() {
       >
         <div>
           <label className="label" htmlFor="cert-id">
-            Certificate ID
+            Report ID
           </label>
           <input
             id="cert-id"
@@ -64,82 +66,61 @@ function VerifyInner() {
           />
         </div>
         <button className="btn-primary w-full" disabled={busy || !certId.trim()}>
-          {busy ? "Checking the registry…" : "Verify certificate"}
+          {busy ? "Checking the registry…" : "Verify report"}
         </button>
       </form>
 
-      {error && <p className="rounded-lg bg-risk-high/5 p-3 text-sm text-risk-high">{error}</p>}
+      {error && <p className="text-sm text-risk-high">{error}</p>}
 
       {result && (
-        <div
-          className={`card ring-2 ${
-            result.status === "valid" ? "ring-risk-safe/30" : "ring-risk-high/30"
-          }`}
-        >
+        <div className="card p-5">
           <div className="flex items-start gap-3">
             <span
-              className={`grid h-10 w-10 shrink-0 place-items-center rounded-full text-xl font-bold text-white ${
-                result.status === "valid" ? "bg-risk-safe" : "bg-risk-high"
+              className={`pill shrink-0 px-2.5 py-1 ${
+                valid ? "pill-positive" : "pill-negative"
               }`}
-              aria-hidden
             >
-              {result.status === "valid" ? "\u2713" : "!"}
-            </span>
-            <div className="min-w-0">
-              <p
-                className={`text-sm font-bold ${
-                  result.status === "valid" ? "text-risk-safe" : "text-risk-high"
+              <span
+                aria-hidden
+                className={`h-1.5 w-1.5 rounded-full ${
+                  valid ? "bg-risk-safe" : "bg-risk-high"
                 }`}
-              >
-                {result.status === "valid"
-                  ? "Authentic certificate"
-                  : result.message || "Not found in the official registry"}
-              </p>
-              <p className="mt-0.5 break-all font-mono text-[11px] text-slate-500">
-                {result.certificate_id}
-              </p>
-
-              {result.status === "valid" && (
-                <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2 text-xs">
-                  <div>
-                    <dt className="text-slate-500">Risk score</dt>
-                    <dd className="font-semibold text-slate-800">
-                      {result.assessment?.score ?? "—"}/100
-                    </dd>
-                  </div>
-                  <div>
-                    <dt className="text-slate-500">Band</dt>
-                    <dd className="font-semibold text-slate-800">
-                      {result.assessment?.band ?? "—"}
-                    </dd>
-                  </div>
-                  <div>
-                    <dt className="text-slate-500">Jurisdiction</dt>
-                    <dd className="font-semibold text-slate-800">
-                      {result.assessment?.country ?? "—"}
-                    </dd>
-                  </div>
-                  <div>
-                    <dt className="text-slate-500">Issued</dt>
-                    <dd className="font-semibold text-slate-800">{result.issued_at ?? "—"}</dd>
-                  </div>
-                  <div className="col-span-2">
-                    <dt className="text-slate-500">Coordinates screened</dt>
-                    <dd className="font-mono text-[11px] text-slate-800">
-                      {result.assessment?.latitude ?? "—"}, {result.assessment?.longitude ?? "—"}
-                    </dd>
-                  </div>
-                </dl>
-              )}
-
-              {result.status !== "valid" && (
-                <p className="mt-2 text-xs text-slate-600">
-                  Treat the document as unverified. Ask the issuer to re-share the original PDF, or
-                  contact the registry.
-                </p>
-              )}
-            </div>
+              />
+              {valid ? "Authentic report" : result.message || "Not found in the registry"}
+            </span>
           </div>
+          <p className="mt-2 break-all font-mono text-[11px] text-muted">{result.certificate_id}</p>
+
+          {valid && (
+            <dl className="mt-4 border-t border-rule pt-2">
+              {(
+                [
+                  ["Risk score", `${result.assessment?.score ?? "—"}/100`],
+                  ["Band", result.assessment?.band ?? "—"],
+                  ["Jurisdiction", result.assessment?.country ?? "—"],
+                  ["Issued", result.issued_at ?? "—"],
+                ] as const
+              ).map(([name, value]) => (
+                <div key={name} className="ledger-row">
+                  <dt className="shrink-0 text-muted">{name}</dt>
+                  <dd className="tnum text-right font-medium text-ink">{value}</dd>
+                </div>
+              ))}
+              <div className="ledger-row">
+                <dt className="shrink-0 text-muted">Coordinates screened</dt>
+                <dd className="text-right font-mono text-xs text-ink">
+                  {result.assessment?.latitude ?? "—"}, {result.assessment?.longitude ?? "—"}
+                </dd>
+              </div>
+            </dl>
+          )}
+
+          {!valid && (
+            <p className="mt-2 text-xs leading-relaxed text-muted">
+              Treat the document as unverified. Ask the issuer to re-share the original PDF, or
+              contact the registry.
+            </p>
+          )}
         </div>
       )}
     </div>
@@ -148,7 +129,7 @@ function VerifyInner() {
 
 export default function VerifyPage() {
   return (
-    <Suspense fallback={<p className="card animate-pulse text-sm text-slate-500">Loading…</p>}>
+    <Suspense fallback={<div className="card p-5 text-sm text-muted">Loading…</div>}>
       <VerifyInner />
     </Suspense>
   );

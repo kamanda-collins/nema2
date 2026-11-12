@@ -17,17 +17,11 @@ export default function DecisionChecklist({ result }: { result: AssessPlotRespon
   }
 
   return (
-    <section className="card border-l-4 border-l-brand">
-      <p className="label">Before you pay a deposit</p>
-      <h2 className="text-lg font-bold text-slate-900">Your next verification steps</h2>
-      <ol className="mt-4 space-y-3">
-        {steps.map((step, index) => (
-          <li key={step} className="flex gap-3 text-sm leading-relaxed text-slate-700">
-            <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-brand text-xs font-bold text-white">
-              {index + 1}
-            </span>
-            <span>{step}</span>
-          </li>
+    <section className="card p-5">
+      <h2 className="text-base font-medium leading-tight text-ink">Before you pay a deposit</h2>
+      <ol className="mt-3 list-decimal space-y-2 pl-5 text-sm leading-relaxed text-muted marker:text-faint">
+        {steps.map((step) => (
+          <li key={step}>{step}</li>
         ))}
       </ol>
     </section>

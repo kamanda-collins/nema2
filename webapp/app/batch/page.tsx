@@ -51,10 +51,10 @@ function parseCsv(text: string): { plots: BatchPlotItem[]; errors: string[] } {
   return { plots: plots.slice(0, 100), errors };
 }
 
-const TONE: Record<string, string> = {
-  green: "text-risk-safe",
-  yellow: "text-risk-caution",
-  red: "text-risk-high",
+const DOT: Record<string, string> = {
+  green: "bg-risk-safe",
+  yellow: "bg-[#d97706]",
+  red: "bg-risk-high",
 };
 
 export default function BatchPage() {
@@ -99,7 +99,7 @@ export default function BatchPage() {
       });
       window.open(certificateDownloadUrl(resp.certificate_id), "_blank", "noopener");
     } catch (err) {
-      setError(err instanceof ApiError ? err.detail : "Could not issue the certificate.");
+      setError(err instanceof ApiError ? err.detail : "Could not issue the report.");
     } finally {
       setIssuing(null);
     }
@@ -142,22 +142,22 @@ export default function BatchPage() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `nema-batch-screening-${Date.now()}.csv`;
+    a.download = `plot-screener-batch-${Date.now()}.csv`;
     a.click();
     URL.revokeObjectURL(url);
   }
 
   return (
-    <div className="space-y-6">
-      <section>
-        <h1 className="text-2xl font-bold text-slate-900">Batch portfolio screening</h1>
-        <p className="mt-1 max-w-2xl text-sm text-slate-600">
-          Screen up to 100 plots in one pass — for law firms, surveyors, SACCOs and bank lending
+    <div className="space-y-5">
+      <header>
+        <h1 className="text-2xl font-medium leading-tight text-ink">Batch portfolio screening</h1>
+        <p className="mt-1 max-w-2xl text-sm text-muted">
+          Screen up to 100 plots in one pass, for law firms, surveyors, SACCOs and bank lending
           desks reviewing a portfolio. Part of the Law Firm / Surveyor Pack.
         </p>
-      </section>
+      </header>
 
-      <div className="card space-y-3">
+      <div className="card space-y-3 p-5">
         <div>
           <label className="label" htmlFor="batch-csv">
             Paste your portfolio (CSV)
@@ -168,16 +168,16 @@ export default function BatchPage() {
             value={csv}
             onChange={(e) => setCsv(e.target.value)}
           />
-          <p className="mt-1 text-[11px] text-slate-500">
-            Columns: <code className="font-mono">lat, lon, label, width_m, length_m</code> — the
+          <p className="mt-1 text-[11px] text-muted">
+            Columns: <code className="font-mono">lat, lon, label, width_m, length_m</code>, the
             header row is optional and the last two columns default to 30 m.
           </p>
         </div>
 
         {parsed.errors.length > 0 && (
-          <ul className="rounded-lg bg-risk-caution/5 p-3 text-xs text-risk-caution">
+          <ul className="text-xs text-risk-high">
             {parsed.errors.map((msg) => (
-              <li key={msg}>• {msg}</li>
+              <li key={msg}>{msg}</li>
             ))}
           </ul>
         )}
@@ -189,7 +189,7 @@ export default function BatchPage() {
               : `Screen ${parsed.plots.length} plot${parsed.plots.length === 1 ? "" : "s"}`}
           </button>
           {results && (
-            <button className="btn-ghost" onClick={downloadCsv}>
+            <button className="btn-secondary" onClick={downloadCsv}>
               Download results as CSV
             </button>
           )}
@@ -197,11 +197,11 @@ export default function BatchPage() {
       </div>
 
       {paywall && (
-        <div className="rounded-lg border border-risk-caution/40 bg-risk-caution/5 p-3 text-sm">
-          <p className="font-semibold text-risk-caution">Law Firm / Surveyor Pack required</p>
-          <p className="mt-1 text-slate-600">
+        <div className="card p-3 text-sm">
+          <p className="font-medium text-ink">Law Firm / Surveyor Pack required</p>
+          <p className="mt-1 text-muted">
             Batch screening is available on the Law Firm tier.{" "}
-            <a href="/pricing" className="font-semibold text-brand underline">
+            <a href="/pricing" className="underline hover:text-ink">
               View pricing
             </a>
             .
@@ -209,23 +209,38 @@ export default function BatchPage() {
         </div>
       )}
 
-      {error && !paywall && (
-        <p className="rounded-lg bg-risk-high/5 p-3 text-sm text-risk-high">{error}</p>
-      )}
+      {error && !paywall && <p className="text-sm text-risk-high">{error}</p>}
 
       {summary && (
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <div className="card grid grid-cols-2 divide-line sm:grid-cols-4 sm:divide-x">
           {(
             [
-              ["Screened", summary.ok, "text-slate-800"],
-              ["High risk", summary.high, "text-risk-high"],
-              ["Caution", summary.caution, "text-risk-caution"],
-              ["Safe", summary.safe, "text-risk-safe"],
+              ["Screened", summary.ok],
+              ["High risk", summary.high],
+              ["Caution", summary.caution],
+              ["Safe", summary.safe],
             ] as const
-          ).map(([label, value, tone]) => (
-            <div key={label} className="card">
-              <p className="label">{label}</p>
-              <p className={`text-2xl font-bold ${tone}`}>{value}</p>
+          ).map(([label, value], i) => (
+            <div
+              key={label}
+              className={`px-4 py-3 ${i < 2 ? "border-b border-rule sm:border-b-0" : ""} ${
+                i % 2 === 1 ? "border-l border-rule sm:border-l-0" : ""
+              } sm:border-l sm:first:border-l-0`}
+            >
+              <p className="text-xs text-muted">{label}</p>
+              <p
+                className={`tnum mt-0.5 text-2xl font-medium ${
+                  label === "High risk"
+                    ? "text-risk-high"
+                    : label === "Caution"
+                      ? "text-[#92400e]"
+                      : label === "Safe"
+                        ? "text-risk-safe"
+                        : "text-ink"
+                }`}
+              >
+                {value}
+              </p>
             </div>
           ))}
         </div>
@@ -234,53 +249,53 @@ export default function BatchPage() {
       {results && (
         <div className="card overflow-x-auto p-0">
           <table className="w-full min-w-[680px] text-left text-xs">
-            <thead className="border-b border-slate-200 bg-slate-50">
-              <tr className="text-slate-500">
-                <th className="px-3 py-2 font-semibold">Plot</th>
-                <th className="px-3 py-2 font-semibold">Score</th>
-                <th className="px-3 py-2 font-semibold">Band</th>
-                <th className="px-3 py-2 font-semibold">Distance</th>
-                <th className="px-3 py-2 font-semibold">Nearest feature</th>
-                <th className="px-3 py-2 font-semibold">Certificate</th>
+            <thead>
+              <tr className="border-b border-line text-muted">
+                <th className="px-4 py-2 font-normal">Plot</th>
+                <th className="px-3 py-2 text-right font-normal">Score</th>
+                <th className="px-3 py-2 font-normal">Band</th>
+                <th className="px-3 py-2 text-right font-normal">Distance</th>
+                <th className="px-3 py-2 font-normal">Nearest feature</th>
+                <th className="px-3 py-2 font-normal">Report</th>
               </tr>
             </thead>
             <tbody>
               {results.map((row, idx) => (
-                <tr key={`${row.label}-${idx}`} className="border-b border-slate-100 last:border-0">
-                  <td className="px-3 py-2">
-                    <span className="font-medium text-slate-800">{row.label}</span>
-                    <span className="block font-mono text-[10px] text-slate-400">
+                <tr key={`${row.label}-${idx}`} className="border-b border-rule last:border-b-0">
+                  <td className="px-4 py-2.5">
+                    <span className="font-medium text-ink">{row.label}</span>
+                    <span className="tnum block font-mono text-[10px] text-faint">
                       {row.lat.toFixed(4)}, {row.lon.toFixed(4)}
                     </span>
                   </td>
                   {row.status === "success" ? (
                     <>
-                      <td
-                        className={`px-3 py-2 font-semibold ${
-                          TONE[row.traffic_light ?? ""] ?? ""
-                        }`}
-                      >
-                        {row.score}/100
+                      <td className="tnum px-3 py-2.5 text-right font-medium text-ink">
+                        {row.score}
                       </td>
-                      <td className="px-3 py-2">
-                        <span className={`pill bg-slate-100 ${TONE[row.traffic_light ?? ""] ?? ""}`}>
+                      <td className="px-3 py-2.5">
+                        <span className="pill-neutral">
+                          <span
+                            aria-hidden
+                            className={`h-1.5 w-1.5 rounded-full ${
+                              DOT[row.traffic_light ?? ""] ?? "bg-control"
+                            }`}
+                          />
                           {row.band}
                         </span>
                       </td>
-                      <td className="px-3 py-2 text-slate-600">
+                      <td className="tnum px-3 py-2.5 text-right text-muted">
                         {row.min_distance_meters != null
-                          ? `${Math.round(row.min_distance_meters)} m`
+                          ? `${Math.round(row.min_distance_meters).toLocaleString("en")} m`
                           : "—"}
                         {row.in_wetland && (
-                          <span className="ml-1 font-semibold text-risk-high">in wetland</span>
+                          <span className="ml-1 font-medium text-risk-high">in wetland</span>
                         )}
                       </td>
-                      <td className="px-3 py-2 text-slate-600">
-                        {row.nearest_feature_kind ?? "—"}
-                      </td>
-                      <td className="px-3 py-2">
+                      <td className="px-3 py-2.5 text-muted">{row.nearest_feature_kind ?? "—"}</td>
+                      <td className="px-3 py-2.5">
                         <button
-                          className="text-brand underline disabled:opacity-50"
+                          className="underline hover:text-ink disabled:opacity-45"
                           disabled={issuing === row.label}
                           onClick={() => issueFor(row)}
                         >
@@ -289,7 +304,7 @@ export default function BatchPage() {
                       </td>
                     </>
                   ) : (
-                    <td colSpan={5} className="px-3 py-2 text-risk-high">
+                    <td colSpan={5} className="px-3 py-2.5 text-risk-high">
                       {row.error || "Screening failed for this plot."}
                     </td>
                   )}

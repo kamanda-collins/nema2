@@ -157,6 +157,100 @@ def test_pro_tier_can_generate_reports_when_explicitly_enabled(isolated_db, monk
     assert fetched["requests_used"] == 1
 
 
+# --- Pay-per-certificate entitlement (credit-based 'instant' tier) -----------------------
+
+def test_instant_tier_is_not_quota_blocked(isolated_db):
+    """
+    Regression: 'instant' is pay-per-certificate (reports_per_month = 0), which
+    was being read as "zero requests allowed" and returned 429 for every call —
+    blocking the very product the customer paid for.
+    """
+    record = storage.create_api_key("Instant Buyer", tier="instant", db_path=isolated_db)
+    resp = client.post(
+        "/api/v1/assess-plot",
+        json={"lat": 0.35, "lon": 32.6},
+        headers={"X-API-Key": record["key"]},
+    )
+    assert resp.status_code == 200
+
+
+def test_instant_tier_without_credits_is_refused_not_quota_blocked(isolated_db, monkeypatch):
+    monkeypatch.setenv("ENABLE_PROFESSIONAL_REPORTS", "true")
+    record = storage.create_api_key("Instant Buyer", tier="instant", db_path=isolated_db)
+    resp = client.post(
+        "/api/v1/reports/generate",
+        json={"lat": 0.3476, "lon": 32.5825},
+        headers={"X-API-Key": record["key"]},
+    )
+    # 402 (buy a credit) — not 429 (monthly quota), which is unactionable here.
+    assert resp.status_code == 402
+    assert "credits" in resp.json()["detail"].lower()
+
+
+def test_instant_tier_spends_one_credit_per_certificate(isolated_db, monkeypatch):
+    monkeypatch.setenv("ENABLE_PROFESSIONAL_REPORTS", "true")
+    record = storage.create_api_key(
+        "Instant Buyer", tier="instant", db_path=isolated_db, certificate_credits=1
+    )
+    headers = {"X-API-Key": record["key"]}
+
+    first = client.post("/api/v1/reports/generate", json={"lat": 0.3476, "lon": 32.5825}, headers=headers)
+    assert first.status_code == 200
+    assert first.json()["certificate_id"].startswith("NEMA-")
+    assert storage.get_api_key(record["key"], db_path=isolated_db)["certificate_credits"] == 0
+
+    second = client.post("/api/v1/reports/generate", json={"lat": 0.3476, "lon": 32.5825}, headers=headers)
+    assert second.status_code == 402
+    assert "credits" in second.json()["detail"].lower()
+
+
+def test_subscription_tier_does_not_spend_credits(isolated_db, monkeypatch):
+    """pro/law_firm are quota-based, so credits must be irrelevant to them."""
+    monkeypatch.setenv("ENABLE_PROFESSIONAL_REPORTS", "true")
+    record = storage.create_api_key("Pro User", tier="pro", db_path=isolated_db)
+    resp = client.post(
+        "/api/v1/reports/generate",
+        json={"lat": 0.3476, "lon": 32.5825},
+        headers={"X-API-Key": record["key"]},
+    )
+    assert resp.status_code == 200
+    assert storage.get_api_key(record["key"], db_path=isolated_db)["certificate_credits"] == 0
+
+
+def test_usage_endpoint_reports_credit_based_tier(isolated_db):
+    record = storage.create_api_key(
+        "Instant Buyer", tier="instant", db_path=isolated_db, certificate_credits=4
+    )
+    resp = client.get("/api/v1/billing/usage", headers={"X-API-Key": record["key"]})
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["credit_based"] is True
+    assert data["certificate_credits"] == 4
+    # No monthly ceiling, so 'remaining' is meaningless for this tier.
+    assert data["unlimited"] is True
+
+
+def test_async_route_cannot_bypass_white_label_gate(isolated_db, monkeypatch):
+    """
+    The async route forwards 'branding' to the Celery worker. Gating only the
+    synchronous route let a lower tier obtain agency branding by choosing
+    /api/v1/reports/generate-async instead.
+    """
+    monkeypatch.setenv("ENABLE_PROFESSIONAL_REPORTS", "true")
+    record = storage.create_api_key(
+        "Instant Buyer", tier="instant", db_path=isolated_db, certificate_credits=1
+    )
+    resp = client.post(
+        "/api/v1/reports/generate-async",
+        json={"lat": 0.3476, "lon": 32.5825, "branding": {"agency_name": "Someone"}},
+        headers={"X-API-Key": record["key"]},
+    )
+    assert resp.status_code == 402
+    assert "White-label" in resp.json()["detail"]
+    # The refusal must not have spent the paid credit.
+    assert storage.get_api_key(record["key"], db_path=isolated_db)["certificate_credits"] == 1
+
+
 # --- Payments -----------------------------------------------------------------------------
 
 def test_payment_initiation_degrades_without_credentials():

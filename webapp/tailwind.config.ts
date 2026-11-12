@@ -8,23 +8,34 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        // Traffic-light risk palette (mirrors risk_score.py bands)
+        // Achromatic chrome
+        ink: "#0a0a0a",
+        muted: "#6b6b6b",
+        faint: "#8a8a8a",
+        line: "#e4e7ec",
+        rule: "#eef0f3",
+        control: "#d4d4d4",
+        raised: "#eef0f3",
+        ground: "#f2f4f7",
+        // The one primary action is near-black
+        accent: "#141414",
+        // The one data hue (buffer ring, flood components)
+        chart: "#1d5fbf",
+        // Status colours, on the risk verdict only
         risk: {
           safe: "#2e7d32",
-          caution: "#f57c00",
-          high: "#c62828",
-        },
-        brand: {
-          DEFAULT: "#0d47a1",
-          accent: "#1e88e5",
-          earth: "#1b5e20",
+          caution: "#92400e",
+          high: "#c4242a",
         },
       },
       fontFamily: {
-        sans: ["var(--font-sans)", "system-ui", "sans-serif"],
+        sans: ["var(--font-sans)"],
+        mono: ["var(--font-mono)"],
       },
-      boxShadow: {
-        card: "0 4px 20px rgba(0,0,0,0.08)",
+      boxShadow: {},
+      borderRadius: {
+        card: "8px",
+        control: "6px",
       },
     },
   },

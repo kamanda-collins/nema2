@@ -10,6 +10,10 @@ import os
 import pytest
 
 from storage import (
+    add_certificate_credits,
+    consume_certificate_credit,
+    create_api_key,
+    get_api_key,
     get_certificate,
     init_db,
     log_event,
@@ -17,6 +21,7 @@ from storage import (
     recent_feedback,
     save_certificate,
     save_feedback,
+    set_certificate_credits,
     stats,
     utc_now,
 )
@@ -140,6 +145,56 @@ def test_stats_aggregates_activity(db):
     assert summary["events"] == 1
     assert summary["certificates"] == 2
     assert summary["certificates_by_band"] == {"Safe": 1, "High Risk": 1}
+
+
+# --- Pay-per-certificate credits ---------------------------------------------------------
+
+def test_create_api_key_seeds_certificate_credits(db):
+    record = create_api_key("Instant Buyer", tier="instant", db_path=db, certificate_credits=3)
+    assert record["certificate_credits"] == 3
+    assert get_api_key(record["key"], db_path=db)["certificate_credits"] == 3
+
+
+def test_create_api_key_defaults_to_no_credits(db):
+    record = create_api_key("Free User", tier="free", db_path=db)
+    assert record["certificate_credits"] == 0
+
+
+def test_add_certificate_credits_accumulates(db):
+    record = create_api_key("Topup", tier="instant", db_path=db)
+    assert add_certificate_credits(record["key"], 2, db_path=db) == 2
+    assert add_certificate_credits(record["key"], 1, db_path=db) == 3
+    assert get_api_key(record["key"], db_path=db)["certificate_credits"] == 3
+
+
+def test_set_certificate_credits_is_absolute_and_never_negative(db):
+    record = create_api_key("Set", tier="instant", db_path=db, certificate_credits=5)
+    assert set_certificate_credits(record["key"], 2, db_path=db) is True
+    assert get_api_key(record["key"], db_path=db)["certificate_credits"] == 2
+    assert set_certificate_credits(record["key"], -5, db_path=db) is True
+    assert get_api_key(record["key"], db_path=db)["certificate_credits"] == 0
+
+
+def test_consume_certificate_credit_spends_one_at_a_time(db):
+    record = create_api_key("Spender", tier="instant", db_path=db, certificate_credits=2)
+    assert consume_certificate_credit(record["key"], db_path=db) is True
+    assert get_api_key(record["key"], db_path=db)["certificate_credits"] == 1
+    assert consume_certificate_credit(record["key"], db_path=db) is True
+    assert get_api_key(record["key"], db_path=db)["certificate_credits"] == 0
+
+
+def test_consume_certificate_credit_refuses_when_empty(db):
+    """An exhausted balance must never go negative (no free certificates)."""
+    record = create_api_key("Empty", tier="instant", db_path=db, certificate_credits=0)
+    assert consume_certificate_credit(record["key"], db_path=db) is False
+    assert get_api_key(record["key"], db_path=db)["certificate_credits"] == 0
+
+
+def test_certificate_credit_helpers_degrade_on_unknown_key(db):
+    assert add_certificate_credits("nema_missing", 1, db_path=db) is None
+    assert set_certificate_credits("nema_missing", 1, db_path=db) is False
+    assert consume_certificate_credit("nema_missing", db_path=db) is False
+    assert add_certificate_credits(None, 1, db_path=db) is None
 
 
 # --- Graceful degradation ----------------------------------------------------------------

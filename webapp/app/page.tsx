@@ -11,7 +11,7 @@ import RiskScorecard from "@/components/RiskScorecard";
 import { ApiError, assessPlot } from "@/lib/api";
 import type { AssessPlotResponse, CadastralSearchResponse, FloodRisk } from "@/lib/types";
 
-/** Default view: Kampala CBD — keeps the map useful before any screening. */
+/** Default view: Kampala CBD, keeps the map useful before any screening. */
 const DEFAULT_CENTRE = { lat: 0.3476, lon: 32.5825 };
 
 export default function HomePage() {
@@ -54,7 +54,7 @@ export default function HomePage() {
     }
   }
 
-  /** Cadastral hit → prefill coordinates and screen that parcel. */
+  /** Cadastral hit -> prefill coordinates and screen that parcel. */
   function useParcel(found: CadastralSearchResponse) {
     if (!found.centroid) return;
     setParcel(found);
@@ -77,22 +77,18 @@ export default function HomePage() {
   const flood: FloodRisk | null = result?.flood_risk ?? null;
 
   return (
-    <div className="space-y-6">
-      {/* Hero */}
-      <section className="rounded-2xl bg-gradient-to-br from-brand to-brand-accent px-6 py-8 text-white">
-        <h1 className="text-2xl font-bold sm:text-3xl">
-          Check this location before you pay a deposit.
-        </h1>
-        <p className="mt-2 max-w-2xl text-sm text-blue-50">
-          Find mapped wetland and water-feature signals around a pin. Use the result to decide
-          whether to pause, inspect, or obtain a surveyor and authority verification—never as
-          proof that land is cleared.
+    <div className="space-y-5">
+      {/* Title row */}
+      <header>
+        <h1 className="text-2xl font-medium leading-tight text-ink">Screen a plot</h1>
+        <p className="mt-1 max-w-2xl text-sm text-muted">
+          Check mapped wetland, riparian and flood signals before you pay a deposit.
         </p>
-      </section>
+      </header>
 
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,380px)_minmax(0,1fr)]">
-        {/* Left: inputs */}
-        <div className="space-y-4">
+      <div className="grid gap-3 lg:grid-cols-[minmax(0,340px)_minmax(0,1fr)]">
+        {/* Left: the screening form */}
+        <div className="space-y-3">
           <PlotInput
             value={form}
             onChange={setForm}
@@ -105,11 +101,11 @@ export default function HomePage() {
           <CadastralSearch onParcelFound={useParcel} />
 
           {paywall && (
-            <div className="rounded-lg border border-risk-caution/40 bg-risk-caution/5 p-3 text-xs">
-              <p className="font-semibold text-risk-caution">Monthly quota reached</p>
-              <p className="mt-1 text-slate-600">
+            <div className="card p-3 text-xs">
+              <p className="font-medium text-ink">Monthly quota reached</p>
+              <p className="mt-1 text-muted">
                 Your API key has used its allowance for this month.{" "}
-                <a href="/pricing" className="font-semibold text-brand underline">
+                <a href="/pricing" className="underline hover:text-ink">
                   Upgrade your plan
                 </a>
                 .
@@ -117,13 +113,56 @@ export default function HomePage() {
             </div>
           )}
 
-          {error && !paywall && (
-            <p className="rounded-lg bg-risk-high/5 p-3 text-xs text-risk-high">{error}</p>
-          )}
+          {error && !paywall && <p className="text-xs text-risk-high">{error}</p>}
         </div>
 
-        {/* Right: map + results */}
-        <div className="space-y-4">
+        {/* Right: the verdict first, then its evidence */}
+        <div className="flex flex-col gap-3">
+          {busy && (
+            <div className="card p-5 text-sm text-muted">
+              Querying wetland layers and computing the risk score…
+            </div>
+          )}
+
+          {!result && !busy && (
+            <div className="card p-5">
+              <p className="text-xs text-muted">Reading a verdict</p>
+              <ol className="mt-2 space-y-2.5 text-sm leading-relaxed text-ink">
+                <li className="flex gap-2.5">
+                  <span aria-hidden className="mt-2 h-2 w-2 shrink-0 rounded-full bg-risk-high" />
+                  <span>
+                    <span className="font-medium">Mapped overlap / close signal</span>: pause the
+                    transaction and obtain professional advice.
+                  </span>
+                </li>
+                <li className="flex gap-2.5">
+                  <span aria-hidden className="mt-2 h-2 w-2 shrink-0 rounded-full bg-[#d97706]" />
+                  <span>
+                    <span className="font-medium">Needs verification</span>: a nearby feature,
+                    uncertain pin, or incomplete coverage needs field checks.
+                  </span>
+                </li>
+                <li className="flex gap-2.5">
+                  <span aria-hidden className="mt-2 h-2 w-2 shrink-0 rounded-full bg-risk-safe" />
+                  <span>
+                    <span className="font-medium">No mapped signal</span>: this is not a clearance;
+                    unmapped or seasonal features may still exist.
+                  </span>
+                </li>
+              </ol>
+              <p className="mt-3 text-xs leading-relaxed text-muted">
+                Results describe mapped signals and data coverage. Buffer requirements vary by
+                feature and jurisdiction and must be confirmed by the responsible authority.
+              </p>
+            </div>
+          )}
+
+          {result && (
+            <div className="space-y-3">
+              <RiskScorecard result={result} />
+            </div>
+          )}
+
           <MapPanel
             lat={centre.lat}
             lon={centre.lon}
@@ -132,39 +171,11 @@ export default function HomePage() {
             label={result ? result.location.label : form.label}
             risk={result?.risk ?? null}
             parcelGeometry={parcel?.geometry_geojson ?? null}
-            className="h-[360px]"
+            className="min-h-[360px] flex-1"
           />
 
-          {busy && (
-            <div className="card animate-pulse text-sm text-slate-500">
-              Querying wetland layers and computing the risk score…
-            </div>
-          )}
-
-          {!result && !busy && (
-            <div className="card">
-              <p className="label">How to use this screen</p>
-              <ul className="space-y-2 text-sm text-slate-600">
-                <li>
-                  <span className="font-semibold text-risk-high">Mapped overlap / close signal</span> — pause the transaction and obtain professional advice.
-                </li>
-                <li>
-                  <span className="font-semibold text-risk-caution">Needs verification</span> — a nearby feature, uncertain pin, or incomplete coverage needs field checks.
-                </li>
-                <li>
-                  <span className="font-semibold text-slate-700">No mapped signal</span> — this is not a clearance; unmapped or seasonal features may still exist.
-                </li>
-              </ul>
-              <p className="mt-3 text-xs text-slate-500">
-                Results describe mapped signals and data coverage. Buffer requirements vary by
-                feature and jurisdiction and must be confirmed by the responsible authority.
-              </p>
-            </div>
-          )}
-
           {result && (
-            <div className="space-y-4">
-              <RiskScorecard result={result} />
+            <div className="space-y-3">
               <DecisionChecklist result={result} />
               <FloodPanel flood={flood} loading={includeFlood && !flood} />
               <CertificateActions result={result} />

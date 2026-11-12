@@ -68,31 +68,37 @@ export default function PlotInput({
 
   return (
     <form
-      className="card space-y-4"
+      className="card space-y-4 p-5"
       onSubmit={(e) => {
         e.preventDefault();
         if (canSubmit && !busy) onSubmit();
       }}
     >
-      {/* Mode switch */}
-      <div className="flex gap-1 rounded-lg bg-slate-100 p-1">
-        {MODES.map((m) => (
-          <button
-            key={m.id}
-            type="button"
-            onClick={() => set("mode", m.id)}
-            className={`flex-1 rounded-md px-3 py-2 text-xs font-semibold transition-colors ${
-              value.mode === m.id
-                ? "bg-white text-brand shadow-sm"
-                : "text-slate-500 hover:text-slate-700"
-            }`}
-          >
-            {m.label}
-          </button>
-        ))}
+      {/* Mode switch: a segmented control as wide as its options */}
+      <div>
+        <p className="label">Where is the plot?</p>
+        <div
+          role="tablist"
+          aria-label="Input method"
+          className="inline-flex max-w-full rounded-md bg-raised p-1"
+        >
+          {MODES.map((m) => (
+            <button
+              key={m.id}
+              type="button"
+              role="tab"
+              aria-selected={value.mode === m.id}
+              onClick={() => set("mode", m.id)}
+              className={`rounded-[4px] px-3 py-1.5 text-xs font-medium transition-colors ${
+                value.mode === m.id ? "bg-white text-ink" : "text-muted hover:text-ink"
+              }`}
+            >
+              {m.label}
+            </button>
+          ))}
+        </div>
+        <p className="mt-1.5 text-[11px] text-muted">{active.hint}</p>
       </div>
-
-      <p className="text-[11px] text-slate-500">{active.hint}</p>
 
       {value.mode === "search" && (
         <div>
@@ -156,9 +162,8 @@ export default function PlotInput({
         </div>
       )}
 
-
       {/* Plot metadata */}
-      <div className="grid grid-cols-3 gap-3 border-t border-slate-100 pt-3">
+      <div className="grid grid-cols-3 gap-3 border-t border-rule pt-3">
         <div>
           <label className="label" htmlFor="plot-label">
             Reference
@@ -176,7 +181,7 @@ export default function PlotInput({
           </label>
           <input
             id="plot-width"
-            className="field"
+            className="field tnum"
             type="number"
             min={5}
             max={2000}
@@ -190,7 +195,7 @@ export default function PlotInput({
           </label>
           <input
             id="plot-length"
-            className="field"
+            className="field tnum"
             type="number"
             min={5}
             max={2000}
@@ -200,7 +205,7 @@ export default function PlotInput({
         </div>
       </div>
 
-      <label className="flex cursor-pointer items-start gap-2 rounded-lg bg-slate-50 p-3 text-xs">
+      <label className="flex cursor-pointer items-start gap-2 text-xs leading-relaxed">
         <input
           type="checkbox"
           className="mt-0.5"
@@ -208,28 +213,28 @@ export default function PlotInput({
           onChange={(e) => onIncludeFloodChange(e.target.checked)}
         />
         <span>
-          <span className="font-semibold text-slate-700">Include flood susceptibility</span>
-          <span className="block text-slate-500">
+          <span className="font-medium text-ink">Include flood susceptibility</span>
+          <span className="block text-muted">
             Samples the Copernicus GLO-90 DEM for drainage and ponding (adds a few seconds).
           </span>
         </span>
       </label>
 
-      <label className="flex cursor-pointer items-start gap-2 rounded-lg border border-brand/15 bg-blue-50/60 p-3 text-xs text-slate-700">
+      <label className="flex cursor-pointer items-start gap-2 border-t border-rule pt-3 text-xs leading-relaxed">
         <input
           type="checkbox"
           className="mt-0.5"
           checked={acknowledged}
           onChange={(e) => setAcknowledged(e.target.checked)}
         />
-        <span>
-          <span className="font-semibold">I understand this is a preliminary mapped-data screen.</span>
-          <span className="block text-slate-600">I will not treat a pin result as a land survey, title check, clearance, or authority decision.</span>
+        <span className="text-muted">
+          I understand this is a preliminary mapped-data screen, not a survey, title check or
+          clearance.
         </span>
       </label>
 
       <button type="submit" className="btn-primary w-full" disabled={!canSubmit || busy}>
-        {busy ? "Screening plot…" : "Run compliance screening"}
+        {busy ? "Screening…" : "Screen this plot"}
       </button>
     </form>
   );

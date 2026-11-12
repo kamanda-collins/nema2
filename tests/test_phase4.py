@@ -202,13 +202,18 @@ def test_batch_screens_all_plots_for_law_firm(isolated_db):
     assert record["requests_used"] == 1
 
 
-def test_custom_branding_requires_paid_tier(isolated_db):
+def test_custom_branding_requires_paid_tier(isolated_db, monkeypatch):
+    # Reports must be enabled for the white-label tier gate (not the reports
+    # kill-switch) to be the response the caller sees.
+    monkeypatch.setenv("ENABLE_PROFESSIONAL_REPORTS", "true")
+
+    # Anonymous and free callers are stopped by the certificate gate first.
     anon = client.post(
         "/api/v1/reports/generate",
         json={"lat": 0.35, "lon": 32.6, "branding": {"agency_name": "Someone"}},
     )
     assert anon.status_code == 402
-    assert "White-label" in anon.json()["detail"]
+    assert "professional account" in anon.json()["detail"]
 
     free_key = _make_key(isolated_db, "free")
     free = client.post(
@@ -218,8 +223,26 @@ def test_custom_branding_requires_paid_tier(isolated_db):
     )
     assert free.status_code == 402
 
+    # 'instant' is the pay-per-certificate tier: holding a purchased credit it
+    # may issue certificates but still may not white-label, which is the only
+    # path that actually reaches the Phase 4.1 branding gate.
+    instant_key = storage.create_api_key(
+        "Instant Buyer", tier="instant", db_path=isolated_db, certificate_credits=1
+    )["key"]
+    instant = client.post(
+        "/api/v1/reports/generate",
+        json={"lat": 0.35, "lon": 32.6, "branding": {"agency_name": "Someone"}},
+        headers={"X-API-Key": instant_key},
+    )
+    assert instant.status_code == 402
+    assert "White-label" in instant.json()["detail"]
+    # A branding refusal must not burn the paid credit.
+    assert storage.get_api_key(instant_key, db_path=isolated_db)["certificate_credits"] == 1
 
-def test_pro_tier_gets_custom_branding_certificate(isolated_db):
+
+def test_pro_tier_gets_custom_branding_certificate(isolated_db, monkeypatch):
+    monkeypatch.setenv("ENABLE_PROFESSIONAL_REPORTS", "true")
+
     key = _make_key(isolated_db, "pro")
     resp = client.post(
         "/api/v1/reports/generate",

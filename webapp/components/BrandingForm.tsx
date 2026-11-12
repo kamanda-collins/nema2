@@ -2,7 +2,7 @@
 
 import type { BrandingPayload } from "@/lib/types";
 
-const ACCENTS = ["#0d47a1", "#1b5e20", "#6a1b9a", "#b71c1c", "#e65100", "#00695c"];
+const ACCENTS = ["#141414", "#1d5fbf", "#2e7d32", "#c4242a", "#92400e", "#00695c"];
 const BLANK: BrandingPayload = {
   agency_name: "",
   agency_tagline: "",
@@ -32,16 +32,16 @@ export default function BrandingForm({
   const watermark = (current.watermark_text || current.agency_name || "").toUpperCase();
 
   return (
-    <div className="space-y-3 rounded-lg border border-slate-200 bg-slate-50 p-3">
+    <div className="space-y-3 rounded-md border border-line bg-raised p-3">
       <div className="flex items-start justify-between gap-2">
         <div>
-          <p className="text-xs font-semibold text-slate-700">Agency branding</p>
-          <p className="text-[11px] text-slate-500">
-            Stamped onto the certificate header, footer and map. Pro / Law Firm tiers only.
+          <p className="text-xs font-medium text-ink">Agency branding</p>
+          <p className="text-[11px] text-muted">
+            Stamped onto the report header, footer and map. Pro / Law Firm tiers only.
           </p>
         </div>
         {value && (
-          <button className="text-[11px] text-brand underline" onClick={() => onChange(null)}>
+          <button className="text-[11px] underline hover:text-ink" onClick={() => onChange(null)}>
             reset
           </button>
         )}
@@ -122,9 +122,7 @@ export default function BrandingForm({
               aria-label={`Accent ${hex}`}
               onClick={() => set("accent_color", hex)}
               className={`h-7 w-7 rounded-full border-2 transition-transform ${
-                current.accent_color === hex
-                  ? "scale-110 border-slate-800"
-                  : "border-white shadow-sm"
+                current.accent_color === hex ? "scale-110 border-ink" : "border-white"
               }`}
               style={{ background: hex }}
             />
@@ -133,24 +131,19 @@ export default function BrandingForm({
             className="field ml-2 max-w-[120px] font-mono text-xs"
             value={current.accent_color ?? ""}
             onChange={(e) => set("accent_color", e.target.value)}
-            placeholder="#0d47a1"
+            placeholder="#141414"
           />
         </div>
       </div>
 
       {(current.agency_name || watermark) && (
-        <div className="rounded-lg border border-slate-200 bg-white p-3">
-          <p className="label">Certificate preview</p>
-          <p
-            className="text-sm font-bold"
-            style={{ color: current.accent_color || "#0d47a1" }}
-          >
+        <div className="rounded-md border border-line bg-white p-3">
+          <p className="mb-1 text-xs text-muted">Report preview</p>
+          <p className="text-sm font-medium" style={{ color: current.accent_color || "#141414" }}>
             {current.agency_name || "Your agency"}
           </p>
-          {current.agency_tagline && (
-            <p className="text-[11px] text-slate-500">{current.agency_tagline}</p>
-          )}
-          <p className="mt-2 text-[11px] text-slate-400">
+          {current.agency_tagline && <p className="text-[11px] text-muted">{current.agency_tagline}</p>}
+          <p className="mt-2 text-[11px] text-faint">
             {watermark ? `watermark: ${watermark}` : ""}
             {current.contact_phone ? ` · ${current.contact_phone}` : ""}
             {current.contact_email ? ` · ${current.contact_email}` : ""}

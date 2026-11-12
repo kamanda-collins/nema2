@@ -59,6 +59,32 @@ def test_quota_allows_within_limit():
     assert status["remaining"] == 1
 
 
+def test_instant_tier_quota_is_credit_based_not_zero():
+    """
+    Regression: 'instant' (UGX 25,000 pay-per-certificate) has
+    reports_per_month = 0, which used to be read as "zero requests allowed",
+    so a paying customer's key returned 429 on every request.
+    """
+    status = billing.quota_status("instant", 0)
+    assert status["allowed"] is True
+    assert status["credit_based"] is True
+    assert status["unlimited"] is True
+    # The literal monthly count is retained for display, but must not gate.
+    assert status["limit"] == 0
+
+
+def test_instant_tier_is_the_only_credit_based_tier():
+    credit_based = {
+        tier for tier in billing.list_plans() if billing.tier_requires_certificate_credit(tier)
+    }
+    assert credit_based == {"instant"}
+
+
+def test_tier_requires_certificate_credit_handles_unknown_tier():
+    assert billing.tier_requires_certificate_credit("enterprise") is False
+    assert billing.tier_requires_certificate_credit(None) is False
+
+
 def test_law_firm_is_unlimited():
     status = billing.quota_status("law_firm", 10_000)
     assert status["unlimited"] is True

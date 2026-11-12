@@ -146,6 +146,8 @@ export interface Plan {
   currency: string | null;
   amount: number;
   reports_per_month: number; // -1 = unlimited
+  /** Pay-per-certificate tiers (e.g. instant) have no monthly ceiling. */
+  credit_based?: boolean;
   certificates: boolean;
   includes: string[];
 }
@@ -173,6 +175,9 @@ export interface UsageResponse {
   limit: number;
   remaining: number | null;
   unlimited: boolean;
+  /** True for pay-per-certificate tiers, where `certificate_credits` is the real allowance. */
+  credit_based: boolean;
+  certificate_credits: number;
   last_used_at: string | null;
 }
 

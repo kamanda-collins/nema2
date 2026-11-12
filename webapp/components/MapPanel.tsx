@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import type { GeoJSONPolygon, RiskScorecard } from "@/lib/types";
 
 /**
- * MapLibre GL vector map — replaces the legacy <iframe> embed (plan Phase 2.3).
+ * MapLibre GL vector map, replaces the legacy <iframe> embed (plan Phase 2.3).
  * Renders the plot footprint, the statutory wetland buffer ring and any parcel
  * geometry returned by the cadastral registry, without an external API key.
  */
@@ -77,8 +77,8 @@ function ring(lat: number, lon: number, radiusM: number) {
 }
 
 function accentFor(risk?: RiskScorecard | null) {
-  if (risk?.traffic_light === "red") return "#c62828";
-  if (risk?.traffic_light === "yellow") return "#f57c00";
+  if (risk?.traffic_light === "red") return "#c4242a";
+  if (risk?.traffic_light === "yellow") return "#d97706";
   return "#2e7d32";
 }
 
@@ -183,7 +183,7 @@ export default function MapPanel({
           id: "buffer-fill",
           source: "buffer",
           type: "fill",
-          paint: { "fill-color": "#1e88e5", "fill-opacity": 0.07 },
+          paint: { "fill-color": "#1d5fbf", "fill-opacity": 0.07 },
         },
       },
       {
@@ -206,7 +206,7 @@ export default function MapPanel({
           source: "buffer",
           type: "line",
           paint: {
-            "line-color": "#1e88e5",
+            "line-color": "#1d5fbf",
             "line-width": 1.6,
             "line-dasharray": [2, 1.4],
           },
@@ -235,7 +235,7 @@ export default function MapPanel({
           id: "parcel-outline",
           source: "parcel",
           type: "line",
-          paint: { "line-color": "#6a1b9a", "line-width": 2 },
+          paint: { "line-color": "#0a0a0a", "line-width": 2 },
         });
       }
     }
@@ -259,34 +259,44 @@ export default function MapPanel({
   }, [ready, lat, lon, widthM, lengthM, risk, parcelGeometry]);
 
   return (
-    <div className={`relative overflow-hidden rounded-xl border border-slate-200 ${className}`}>
+    <div className={`relative overflow-hidden rounded-card border border-line ${className}`}>
       <div ref={containerRef} className="h-full min-h-[340px] w-full" />
 
-      <div className="pointer-events-none absolute left-3 top-3 rounded-lg bg-white/95 px-3 py-2 shadow-card">
-        <p className="max-w-[220px] truncate text-xs font-semibold text-slate-800">{label}</p>
-        <p className="text-[11px] text-slate-500">
+      <div className="pointer-events-none absolute left-3 top-3 rounded-md border border-line bg-white px-3 py-2">
+        <p className="max-w-[220px] truncate text-xs font-medium text-ink">{label}</p>
+        <p className="tnum text-[11px] text-muted">
           {lat.toFixed(5)}, {lon.toFixed(5)}
         </p>
-        <p className="text-[11px] text-slate-500">
+        <p className="tnum text-[11px] text-muted">
           {widthM.toFixed(0)} m × {lengthM.toFixed(0)} m
         </p>
       </div>
 
       {error && (
-        <p className="absolute bottom-14 left-3 rounded-lg bg-white/95 px-3 py-1.5 text-[11px] text-risk-high shadow-card">
+        <p className="absolute bottom-14 left-3 rounded-md border border-line bg-white px-3 py-1.5 text-[11px] text-risk-high">
           {error}
         </p>
       )}
 
-      <div className="pointer-events-none absolute bottom-3 right-3 space-y-1 rounded-lg bg-white/95 px-3 py-2 text-[10px] text-slate-600 shadow-card">
+      <div className="pointer-events-none absolute bottom-3 right-3 space-y-1 rounded-md border border-line bg-white px-3 py-2 text-[11px] text-muted">
         <p className="flex items-center gap-1.5">
-          <span className="inline-block h-2 w-3 rounded-sm bg-risk-safe" />
+          <span
+            aria-hidden
+            className="inline-block h-2 w-3 rounded-sm"
+            style={{ background: accentFor(risk) }}
+          />
           plot footprint
         </p>
         <p className="flex items-center gap-1.5">
-          <span className="inline-block h-2 w-3 rounded-sm bg-brand-accent/30" />
+          <span aria-hidden className="inline-block h-2 w-3 rounded-sm bg-chart/30" />
           statutory buffer
         </p>
+        {parcelGeometry && (
+          <p className="flex items-center gap-1.5">
+            <span aria-hidden className="inline-block h-0.5 w-3 bg-ink" />
+            registry parcel
+          </p>
+        )}
       </div>
     </div>
   );

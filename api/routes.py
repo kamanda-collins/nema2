@@ -41,9 +41,16 @@ from storage import (
     stats,
     create_api_key,
     get_api_key,
+    consume_certificate_credit,
 )
 from storage import cleanup_expired_certificates as storage_cleanup_expired
-from billing import get_plan, list_plans, resolve_key_quota, valid_tier
+from billing import (
+    get_plan,
+    list_plans,
+    resolve_key_quota,
+    valid_tier,
+    tier_requires_certificate_credit,
+)
 from flood_risk import flood_risk_assessment
 from cadastral import cadastral_available, search_parcel
 import payments as payment_gateway
@@ -108,6 +115,54 @@ def _record_usage(x_api_key: Optional[str], key_record: Optional[Dict[str, Any]]
         get_api_key(x_api_key, increment_usage=True)
     else:
         _anon_usage[client_host] = _anon_usage.get(client_host, 0) + 1
+
+
+def _reserve_certificate_entitlement(x_api_key: Optional[str], key_record: Optional[Dict[str, Any]]) -> None:
+    """
+    Enforce the pay-per-certificate allowance for credit-based tiers.
+
+    Subscription tiers (pro / law_firm) are covered by their monthly quota, so
+    only credit-based tiers (instant) need a credit. The credit is reserved
+    before the expensive rendering work so two concurrent requests cannot both
+    spend the same credit; refunding an interrupted render belongs to the
+    payment-ledger work described in updates.md.
+    """
+    tier = key_record.get("tier") if key_record else None
+    if not tier_requires_certificate_credit(tier):
+        return
+
+    if not consume_certificate_credit(x_api_key):
+        log_event("api_certificate_credit_exhausted", {"tier": tier})
+        raise HTTPException(
+            status_code=402,
+            detail=(
+                "No certificate credits remaining on this key. Purchase another Instant "
+                "Due Diligence Certificate credit to issue a further report."
+            ),
+        )
+
+
+def _authorised_branding(key_record: Optional[Dict[str, Any]], branding: Any) -> Optional[Dict[str, Any]]:
+    """
+    Gate the white-label payload (plan Phase 4.1). Custom branding is a
+    Pro/Law-Firm feature.
+
+    Both the synchronous and the asynchronous report routes must call this:
+    gating only the synchronous route lets a lower tier obtain agency branding
+    by choosing /api/v1/reports/generate-async instead.
+    """
+    from branding import branding_allowed
+
+    requested = branding if isinstance(branding, dict) else None
+    if not requested:
+        return None
+
+    if not branding_allowed(key_record.get("tier") if key_record else None):
+        raise HTTPException(
+            status_code=402,
+            detail="White-label branding requires the Pro Realtor or Law Firm tier.",
+        )
+    return requested
 
 
 def _spatial_analysis(lat: float, lon: float, width_m: float, length_m: float, plot_label: str):
@@ -261,14 +316,9 @@ def generate_report(req: GenerateReportRequest, request: Request, x_api_key: Opt
         )
 
     # White-label gate (plan Phase 4.1): custom branding is a Pro/Law-Firm feature.
-    from branding import branding_allowed
+    requested_branding = _authorised_branding(key_record, req.branding)
 
-    requested_branding = req.branding if isinstance(req.branding, dict) else None
-    if requested_branding and not branding_allowed(key_record.get("tier") if key_record else None):
-        raise HTTPException(
-            status_code=402,
-            detail="White-label branding requires the Pro Realtor or Law Firm tier.",
-        )
+    _reserve_certificate_entitlement(x_api_key, key_record)
 
     lat, lon = req.lat, req.lon
     site_gdf, wetlands_gdf, prov, in_wetland, wetland_names, min_dist, nearest_kind = _spatial_analysis(
@@ -348,13 +398,18 @@ def generate_report_async(req: GenerateReportRequest, request: Request, x_api_ke
             detail="Could not determine property coordinates. Provide valid lat/lon, landmark query, DMS string, or map link.",
         )
 
+    # Gate branding before reserving the credit, so a refusal cannot burn it.
+    task_branding = _authorised_branding(key_record, req.branding)
+
+    _reserve_certificate_entitlement(x_api_key, key_record)
+
     task_data = {
         "lat": lat,
         "lon": lon,
         "plot_label": req.plot_label,
         "width_m": req.width_m,
         "length_m": req.length_m,
-        "branding": req.branding if isinstance(req.branding, dict) else None,
+        "branding": task_branding,
     }
     
     # Offload to Celery
@@ -506,6 +561,8 @@ def get_usage(x_api_key: Optional[str] = Header(None, alias="X-API-Key")):
         "limit": quota["limit"],
         "remaining": quota["remaining"],
         "unlimited": quota["unlimited"],
+        "credit_based": quota["credit_based"],
+        "certificate_credits": int(key_record.get("certificate_credits") or 0),
         "last_used_at": key_record["last_used_at"],
     }
 

@@ -2,61 +2,138 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ---------------------------------------------------------------------------
+   Achromatic-ledger tokens (design-taste-frontend, app sheet seed 850174758).
+   The chrome holds no colour; colour goes on the risk verdict only.
+--------------------------------------------------------------------------- */
 :root {
-  --font-sans: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --ground: #f2f4f7;
+  --surface: #ffffff;
+  --raised: #eef0f3;
+  --border: #e4e7ec;
+  --rule: #eef0f3;
+  --control: #d4d4d4;
+  --text: #0a0a0a;
+  --muted: #6b6b6b;
+  --accent: #141414;
+
+  /* Status colours — used only on the risk data itself */
+  --positive: #2e7d32;
+  --warning: #92400e;
+  --negative: #c4242a;
+
+  /* The one data hue (buffer ring, flood components) */
+  --chart: #1d5fbf;
+
+  --pill-positive-bg: #dcfae5;
+  --pill-positive-ink: #04250e;
+  --pill-warning-bg: #fffbeb;
+  --pill-warning-ink: #92400e;
+  --pill-negative-bg: #ffedea;
+  --pill-negative-ink: #831c1e;
+  --pill-neutral-bg: #eef0f3;
+  --pill-neutral-ink: #3d3d3d;
+
+  --radius-card: 8px;
+  --radius-control: 6px;
+
+  --font-sans: "Geist", "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "Geist Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
 }
 
 html,
 body {
   padding: 0;
   margin: 0;
-  background: #f5f7fa;
-  color: #10233c;
+  background: var(--ground);
+  color: var(--text);
   -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
 }
 
 /* MapLibre canvas must have an explicit height */
 .maplibregl-map {
   width: 100%;
   height: 100%;
-  border-radius: 0.75rem;
+  border-radius: var(--radius-card);
 }
 
 .maplibregl-popup-content {
   padding: 0.5rem 0.75rem;
-  border-radius: 0.5rem;
+  border-radius: var(--radius-control);
   font-size: 0.8rem;
+}
+
+.maplibregl-ctrl-group {
+  border-radius: var(--radius-control) !important;
+  box-shadow: none !important;
+  border: 1px solid var(--border) !important;
+}
+
+/* The scale and attribution controls render at 10px by default */
+.maplibregl-ctrl-scale,
+.maplibregl-ctrl-attrib {
+  font-size: 11px !important;
 }
 
 @layer components {
   .card {
-    @apply rounded-xl border border-slate-200 bg-white p-5 shadow-card;
+    @apply rounded-lg border border-line bg-white;
   }
 
   .btn {
-    @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2.5
-           text-sm font-semibold transition-colors disabled:cursor-not-allowed
-           disabled:opacity-50;
+    @apply inline-flex h-9 items-center justify-center gap-2 rounded-md px-4
+           text-sm font-medium leading-none transition-colors disabled:cursor-not-allowed
+           disabled:opacity-45;
   }
 
+  /* The one primary action: near-black, no colour in the chrome */
   .btn-primary {
-    @apply btn bg-brand text-white hover:bg-brand-accent;
+    @apply btn bg-accent text-white hover:bg-black;
   }
 
-  .btn-ghost {
-    @apply btn border border-slate-300 bg-white text-slate-700 hover:bg-slate-50;
+  .btn-secondary {
+    @apply btn border border-control bg-white text-ink hover:bg-raised;
   }
 
   .field {
-    @apply w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm
-           outline-none focus:border-brand-accent focus:ring-2 focus:ring-brand-accent/20;
+    @apply block w-full rounded-md border border-control bg-white px-3 py-2 text-sm text-ink
+           outline-none transition-colors focus:border-ink focus:ring-2 focus:ring-ink/10;
   }
 
+  /* Sentence case, readable — no tracked capitals */
   .label {
-    @apply mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500;
+    @apply mb-1 block text-xs font-medium text-muted;
   }
 
   .pill {
-    @apply inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold;
+    @apply inline-flex items-center gap-1.5 rounded-md px-2 py-0.5 text-xs font-medium;
+  }
+
+  .pill-positive {
+    @apply pill bg-[color:var(--pill-positive-bg)] text-[color:var(--pill-positive-ink)];
+  }
+
+  .pill-warning {
+    @apply pill bg-[color:var(--pill-warning-bg)] text-[color:var(--pill-warning-ink)];
+  }
+
+  .pill-negative {
+    @apply pill bg-[color:var(--pill-negative-bg)] text-[color:var(--pill-negative-ink)];
+  }
+
+  .pill-neutral {
+    @apply pill bg-raised text-[color:var(--pill-neutral-ink)];
+  }
+
+  /* Ledger rows: figures right-aligned, tabular */
+  .ledger-row {
+    @apply flex items-baseline justify-between gap-4 border-b border-rule py-2 text-sm last:border-b-0;
+  }
+}
+
+@layer utilities {
+  .tnum {
+    font-variant-numeric: tabular-nums;
   }
 }

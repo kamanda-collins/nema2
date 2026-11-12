@@ -39,7 +39,11 @@ PAYMENT_PLANS: Dict[str, Dict[str, Any]] = {
         "price_display": "UGX 25,000 / KES 650 (~$7)",
         "currency": "USD",
         "amount": 7,
-        "reports_per_month": 0,  # credit-based, not subscription
+        # Pay-per-certificate, not a subscription: there is no monthly request
+        # count. The allowance is the key's purchased certificate credits, so a
+        # literal 0 here would block every request (see quota_status).
+        "reports_per_month": 0,
+        "credit_based": True,
         "certificates": True,
         "includes": [
             "Official stamped 2-page PDF certificate",
@@ -96,6 +100,11 @@ def quota_status(tier: str, requests_used: int) -> Dict[str, Any]:
     """
     Evaluate a key's usage against its tier limit.
 
+    Credit-based tiers (e.g. 'instant') are not limited by a monthly request
+    count — the payer has already paid for the reports, and their allowance is
+    enforced as certificate credits at issuance time. Applying the literal
+    `reports_per_month: 0` to them would deny every request with 429.
+
     Returns a dict describing allowance. Never raises.
     """
     plan = PAYMENT_PLANS.get(tier)
@@ -103,7 +112,8 @@ def quota_status(tier: str, requests_used: int) -> Dict[str, Any]:
         plan = PAYMENT_PLANS["free"]
 
     limit = plan.get("reports_per_month", 0)
-    unlimited = limit == -1
+    credit_based = bool(plan.get("credit_based"))
+    unlimited = limit == -1 or credit_based
     remaining = None if unlimited else max(limit - requests_used, 0)
     allowed = unlimited or requests_used < limit
 
@@ -111,10 +121,20 @@ def quota_status(tier: str, requests_used: int) -> Dict[str, Any]:
         "tier": tier,
         "limit": limit,
         "unlimited": unlimited,
+        "credit_based": credit_based,
         "used": requests_used,
         "remaining": remaining,
         "allowed": allowed,
     }
+
+
+def tier_requires_certificate_credit(tier: Optional[str]) -> bool:
+    """
+    True when the tier issues certificates against purchased credits rather
+    than a monthly allowance (so issuance must spend one).
+    """
+    plan = PAYMENT_PLANS.get(tier or "")
+    return bool(plan and plan.get("credit_based"))
 
 
 def anonymous_quota_status(requests_used: int) -> Dict[str, Any]:

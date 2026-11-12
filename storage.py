@@ -385,19 +385,47 @@ def _init_api_keys_table(cursor) -> None:
             tier TEXT NOT NULL DEFAULT 'free',
             requests_used INTEGER DEFAULT 0,
             created_at TEXT NOT NULL,
-            last_used_at TEXT
+            last_used_at TEXT,
+            certificate_credits INTEGER DEFAULT 0
         );
         """
     )
+    _ensure_api_keys_columns(cursor)
+
+
+def _ensure_api_keys_columns(cursor) -> None:
+    """
+    Bring pre-existing api_keys tables up to the current schema.
+
+    CREATE TABLE IF NOT EXISTS is a no-op on an existing table, so columns
+    added after the first release have to be patched in explicitly.
+    """
+    try:
+        cursor.execute("PRAGMA table_info(api_keys)")
+        existing = {row["name"] for row in cursor.fetchall()}
+    except Exception:
+        return
+
+    if "certificate_credits" not in existing:
+        try:
+            cursor.execute("ALTER TABLE api_keys ADD COLUMN certificate_credits INTEGER DEFAULT 0")
+        except Exception:
+            # A parallel writer may have added it already; the column is the
+            # only thing that matters, so ignoring this is safe.
+            pass
 
 
 def create_api_key(
     name: Optional[str],
     tier: str = "free",
     db_path: Optional[str] = None,
+    certificate_credits: int = 0,
 ) -> Optional[Dict[str, Any]]:
     """
     Mint a new API key bound to a pricing tier.
+
+    certificate_credits seeds the pay-per-certificate allowance used by
+    credit-based tiers (e.g. 'instant'); it is ignored by subscription tiers.
 
     Returns the full key record, or None on failure.
     """
@@ -408,6 +436,7 @@ def create_api_key(
 
     path = _resolve_db_path(db_path)
     key = f"nema_{uuid.uuid4().hex}"
+    credits = max(0, int(certificate_credits or 0))
     try:
         init_db(path)
         with _get_connection(path) as conn:
@@ -415,10 +444,11 @@ def create_api_key(
             _init_api_keys_table(cursor)
             cursor.execute(
                 """
-                INSERT INTO api_keys (key, name, tier, requests_used, created_at, last_used_at)
-                VALUES (?, ?, ?, 0, ?, NULL)
+                INSERT INTO api_keys
+                    (key, name, tier, requests_used, created_at, last_used_at, certificate_credits)
+                VALUES (?, ?, ?, 0, ?, NULL, ?)
                 """,
-                (key, name, tier, utc_now()),
+                (key, name, tier, utc_now(), credits),
             )
             conn.commit()
             return {
@@ -428,6 +458,7 @@ def create_api_key(
                 "requests_used": 0,
                 "created_at": utc_now(),
                 "last_used_at": None,
+                "certificate_credits": credits,
             }
     except Exception:
         return None
@@ -458,7 +489,8 @@ def get_api_key(
                 conn.commit()
             cursor.execute(
                 """
-                SELECT key, name, tier, requests_used, created_at, last_used_at
+                SELECT key, name, tier, requests_used, created_at, last_used_at,
+                       certificate_credits
                 FROM api_keys WHERE key = ?
                 """,
                 (key.strip(),),
@@ -473,6 +505,9 @@ def get_api_key(
                 "requests_used": int(row["requests_used"] or 0),
                 "created_at": row["created_at"],
                 "last_used_at": row["last_used_at"],
+                "certificate_credits": int(row["certificate_credits"] or 0)
+                if "certificate_credits" in row.keys()
+                else 0,
             }
     except Exception:
         return None
@@ -496,6 +531,109 @@ def set_api_key_tier(
             cursor.execute(
                 "UPDATE api_keys SET tier = ? WHERE key = ?",
                 (tier, key.strip()),
+            )
+            conn.commit()
+            return cursor.rowcount > 0
+    except Exception:
+        return False
+
+
+def set_certificate_credits(
+    key: Optional[str],
+    credits: int,
+    db_path: Optional[str] = None,
+) -> bool:
+    """
+    Set a key's pay-per-certificate allowance (absolute value).
+
+    Credit-based tiers (e.g. 'instant') issue a certificate per purchased
+    credit, so this is how a verified payment becomes an entitlement.
+    """
+    if not key:
+        return False
+
+    path = _resolve_db_path(db_path)
+    try:
+        init_db(path)
+        with _get_connection(path) as conn:
+            cursor = conn.cursor()
+            _init_api_keys_table(cursor)
+            cursor.execute(
+                "UPDATE api_keys SET certificate_credits = ? WHERE key = ?",
+                (max(0, int(credits or 0)), key.strip()),
+            )
+            conn.commit()
+            return cursor.rowcount > 0
+    except Exception:
+        return False
+
+
+def add_certificate_credits(
+    key: Optional[str],
+    credits: int = 1,
+    db_path: Optional[str] = None,
+) -> Optional[int]:
+    """
+    Add credits to a key and return the new balance, or None on failure.
+
+    Called after a gateway-confirmed payment for a credit-based plan.
+    """
+    if not key:
+        return None
+
+    path = _resolve_db_path(db_path)
+    try:
+        init_db(path)
+        with _get_connection(path) as conn:
+            cursor = conn.cursor()
+            _init_api_keys_table(cursor)
+            cursor.execute(
+                """
+                UPDATE api_keys
+                SET certificate_credits = certificate_credits + ?
+                WHERE key = ?
+                """,
+                (max(0, int(credits or 0)), key.strip()),
+            )
+            if cursor.rowcount == 0:
+                return None
+            conn.commit()
+            cursor.execute(
+                "SELECT certificate_credits FROM api_keys WHERE key = ?",
+                (key.strip(),),
+            )
+            row = cursor.fetchone()
+            return int(row["certificate_credits"] or 0) if row else None
+    except Exception:
+        return None
+
+
+def consume_certificate_credit(
+    key: Optional[str],
+    db_path: Optional[str] = None,
+) -> bool:
+    """
+    Atomically spend one credit. Returns False when the balance is empty.
+
+    The UPDATE is guarded by `certificate_credits > 0` so two concurrent
+    certificate requests cannot both spend the same credit.
+    """
+    if not key:
+        return False
+
+    path = _resolve_db_path(db_path)
+    try:
+        init_db(path)
+        with _get_connection(path) as conn:
+            cursor = conn.cursor()
+            _init_api_keys_table(cursor)
+            cursor.execute(
+                """
+                UPDATE api_keys
+                SET certificate_credits = certificate_credits - 1
+                WHERE key = ? AND certificate_credits > 0
+                """,
+                (key.strip(),),
             )
             conn.commit()
             return cursor.rowcount > 0

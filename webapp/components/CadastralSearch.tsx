@@ -43,7 +43,7 @@ export default function CadastralSearch({
 
   return (
     <form
-      className="card space-y-3"
+      className="card space-y-3 p-5"
       onSubmit={(e) => {
         e.preventDefault();
         search();
@@ -51,17 +51,17 @@ export default function CadastralSearch({
     >
       <div>
         <p className="label">Search by block &amp; plot number</p>
-        <p className="text-[11px] text-slate-500">
+        <p className="text-[11px] leading-relaxed text-muted">
           {available === null
             ? "Checking the cadastral registry…"
             : available
-              ? "Registry loaded — use the block/plot numbers from the title or survey plan."
+              ? "Registry loaded, use the block/plot numbers from the title or survey plan."
               : "No cadastral registry is loaded on this server. Coordinate and landmark screening still work."}
         </p>
       </div>
 
-      <div className="grid grid-cols-3 gap-2">
-        <div className="col-span-1">
+      <div className="grid grid-cols-[1fr_1fr_auto] gap-2">
+        <div>
           <label className="label" htmlFor="block">
             Block
           </label>
@@ -73,7 +73,7 @@ export default function CadastralSearch({
             onChange={(e) => setBlock(e.target.value)}
           />
         </div>
-        <div className="col-span-1">
+        <div>
           <label className="label" htmlFor="plot">
             Plot
           </label>
@@ -85,10 +85,10 @@ export default function CadastralSearch({
             onChange={(e) => setPlot(e.target.value)}
           />
         </div>
-        <div className="col-span-1 flex items-end">
+        <div className="flex items-end">
           <button
             type="submit"
-            className="btn-primary w-full"
+            className="btn-secondary"
             disabled={busy || !block.trim() || !plot.trim()}
           >
             {busy ? "Looking…" : "Find"}
@@ -99,35 +99,29 @@ export default function CadastralSearch({
       {error && <p className="text-xs text-risk-high">{error}</p>}
 
       {result && result.status === "found" && result.centroid && (
-        <div className="space-y-2 rounded-lg border border-risk-safe/30 bg-risk-safe/5 p-3 text-xs">
-          <p className="font-semibold text-slate-700">
+        <div className="space-y-2 rounded-md border border-line bg-raised p-3 text-xs">
+          <p className="font-medium text-ink">
             {result.parcel_name || `Block ${result.block} / Plot ${result.plot}`}
           </p>
-          <p className="text-slate-600">
+          <p className="tnum text-muted">
             Centroid {result.centroid.lat.toFixed(5)}, {result.centroid.lon.toFixed(5)}
             {result.area_m2 ? ` · ${result.area_m2.toFixed(1)} m²` : ""}
             {result.source ? ` · ${result.source}` : ""}
           </p>
-          <button
-            type="button"
-            className="btn-primary"
-            onClick={() => onParcelFound(result)}
-          >
+          <button type="button" className="btn-primary" onClick={() => onParcelFound(result)}>
             Screen this parcel
           </button>
         </div>
       )}
 
       {result && result.status === "not_found" && (
-        <p className="rounded-lg bg-risk-caution/5 p-3 text-xs text-risk-caution">
+        <p className="text-xs text-muted">
           {result.message || `Block ${block} / Plot ${plot} was not found in the registry.`}
         </p>
       )}
 
       {result && result.status === "not_available" && (
-        <p className="rounded-lg bg-slate-100 p-3 text-xs text-slate-600">
-          {result.message || "No cadastral registry is loaded."}
-        </p>
+        <p className="text-xs text-muted">{result.message || "No cadastral registry is loaded."}</p>
       )}
     </form>
   );
